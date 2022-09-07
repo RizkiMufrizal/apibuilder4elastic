@@ -1,0 +1,376 @@
+flow-nodes:
+  axway-api-management:
+    name: Axway API-Management Utils
+    icon: axway-logo.png
+    description: Flow providing utility functions related to the Axway-API-Management solution. As of today it can be used to lookup a user in API-Gateway Manager and API-Manager to get a union view.
+    category: general
+    methods:
+      lookupCurrentUser:
+        name: Lookup current user
+        description: Looks up the current user in Axway API-Gateway Manager and API-Manager based on the provided Request-Header that contains the session-cookie and CSRF-Token.
+        parameters:
+          requestHeaders:
+            name: Request Headers
+            description: The request headers are used to lookup the current users based on the current session cookie (VIDUSR).
+            required: true
+            initialType: string
+            schema:
+              type: string
+          getApiManagerUser:
+            name: Get the API-Manager user?
+            description: If set to false, the flow-node does not try to lookup the user on the API-Manager. Set it to false, when for instance user authorization is disabled as there might be no belonging user configured in the API-Manager.
+            required: false
+            initialType: boolean
+            schema:
+              default: true
+              type: boolean
+          unrestrictedPermissions:
+            name: Unrestricted Permissions
+            description: 'A comma separated list of the permission(s) to check, if a user should get unrestricted traffic view access. For example: "logs" or "logs,mgmt". The second option requires are user to have both permissions to get the unrestricted view. Defaults to adminusers_modify.'
+            required: false
+            schema:
+              type: string
+          region:
+            name: Region
+            description: 'If the region is set, the corresponding admin node manager is determined based on this region. If no region is set, then the default Admin-Node-Manager is used.'
+            required: false
+            schema:
+              type: string
+        outputs:
+          next:
+            name: Next
+            description: The user was found in API-Gateway and API-Manager.
+            context: $.user
+            schema:
+              type: object
+          error:
+            name: Error
+            description: An unexpected error happened
+            context: $.error
+            schema:
+              type: object
+
+      lookupTopology:
+        name: Lookup topology
+        description: "Looks up the API-Gateway topology, as this is required when running in EMT mode. See https://github.com/Axway-API-Management-Plus/apigateway-openlogging-elk/issues/114. Admin-Node-Manager services are ignored."
+        parameters:
+          requestHeaders:
+            name: Request Headers
+            description: The request headers are used to lookup the topology using the currently logged in user.
+            required: true
+            schema:
+              type: string
+          region:
+            name: Region
+            description: 'If the region is set, the corresponding admin node manager is determined based on this region. If no region is set, then the default Admin-Node-Manager is used.'
+            required: false
+            schema:
+              type: string
+        outputs:
+          next:
+            name: Next
+            description: The API-Gateway topology
+            context: $.gatewayTopology
+            schema:
+              type: object
+          error:
+            name: Error
+            description: An unexpected error happened
+            context: $.error
+            schema:
+              type: object
+
+      lookupAPIDetails:
+        name: Lookup API
+        description: Looks up the details of an API based on the given API-Name and API-Path. Additionally, it returns the configured custom properties for that API. If the API could not be found locally or at the API-Manager unknown API-Details are returned.
+        parameters:
+          apiName:
+            name: API-Name
+            description: Name of the API is primary used to lookup the API
+            required: false
+            initialType: string
+            schema:
+              type: string
+          apiPath:
+            name: Path of the API
+            description: This request path is used to double check that the API found is correct.
+            required: false
+            initialType: string
+            schema:
+              type: string
+          region:
+            name: API-Gateway region
+            description: "The region is optionally configured for each filebeat. If configured it is used in combination with the group-id to lookup the API at the correct API-Manager. API_MANAGER must be configured like so: API_MANAGER=https://default-manager-1:8075,us|group1|https://manager-1:8075,group-2|https://manager-2:8075, ...."
+            required: false
+            initialType: string
+            schema:
+              type: string
+          groupId:
+            name: The API-Gateway Group-ID
+            description: "The ID of the Domain-Group where this event was created. If given, it's used to determined which API-Manager to use for the lookup. Optionally, the region can be used to select the API-Manager in the correct region. For that, the parameter: API_MANAGER must be configured like so: API_MANAGER=http://default-api-manager:8075,regiona|group-1|https://manager-1:8075,group-2|https://manager-2:8075, ...."
+            required: false
+            initialType: string
+            schema:
+              type: string
+          operationId:
+            name: The ID of the operation
+            description: This is ID of how the method is defined in the API-Definition. For instance updatePet
+            required: false
+            initialType: string
+            schema:
+              type: string
+          policy:
+            name: Policy
+            description: Used during local search only to figure out if Policy-Event should be indexed or not.
+            required: false
+            initialType: string
+            schema:
+              type: string
+          verb:
+            name: HTTP Verb
+            description: Used during local search only to figure out if event should be indexed or not.
+            required: false
+            initialType: string
+            schema:
+              type: string
+          disableCustomProperties:
+            name: Disable custom properties
+            description: Turn this to false to disable custom properties against the API-Manager configuration. Additionally, all found custom properties will be mapped into the properties customProperties
+            required: false
+            initialType: boolean
+            schema:
+              default: false
+              type: boolean
+        outputs:
+          next:
+            name: Next
+            description: The API-Proxy how it's configured in the API-Manager incl. custom properties.
+            context: $.api
+            schema:
+              type: object
+          error:
+            name: Error
+            description: An unexpected error happened
+            context: $.error
+            schema:
+              type: object
+
+      lookupApplication:
+        name: Lookup application
+        description: Looks up an application based on the given application id
+        parameters:
+          applicationId:
+            name: Application-ID
+            description: ID of the application as it is stored in the API-Manager
+            required: true
+            schema:
+              type: string
+          region:
+            name: API-Gateway region
+            description: "The region is optionally configured for each filebeat. If configured it is used in combination with the group-id to lookup the API at the correct API-Manager. API_MANAGER must be configured like so: API_MANAGER=https://default-manager-1:8075,us|group1|https://manager-1:8075,group-2|https://manager-2:8075, ...."
+            required: false
+            initialType: string
+            schema:
+              type: string
+          groupId:
+            name: The API-Gateway Group-ID
+            description: "The ID of the Domain-Group where this event was created. If given, it's used to determined which API-Manager to use for the lookup. Optionally, the region can be used to select the API-Manager in the correct region. For that, the parameter: API_MANAGER must be configured like so: API_MANAGER=http://default-api-manager:8075,regiona|group-1|https://manager-1:8075,group-2|https://manager-2:8075, ...."
+            required: false
+            initialType: string
+            schema:
+              type: string
+        outputs:
+          next:
+            name: Next
+            description: The resolved application or an empty application with the given application-ID returned as the name
+            context: $.application
+            schema:
+              type: object
+          error:
+            name: Error
+            description: An unexpected error happened
+            context: $.error
+            schema:
+              type: object
+
+      isIgnoreAPI:
+        name: Is ignore API
+        description: Is using the configuration file to determine if the API should be ignored or not.
+        parameters:
+          apiPath:
+            name: Path of the API
+            description: This request path is used to double check that the API found is correct.
+            required: false
+            initialType: string
+            schema:
+              type: string
+          region:
+            name: API-Gateway region
+            description: "The region is optionally configured for each filebeat. If configured it is used in combination with the group-id to lookup the API at the correct API-Manager. API_MANAGER must be configured like so: API_MANAGER=https://default-manager-1:8075,us|group1|https://manager-1:8075,group-2|https://manager-2:8075, ...."
+            required: false
+            initialType: string
+            schema:
+              type: string
+          groupId:
+            name: The API-Gateway Group-ID
+            description: "The ID of the Domain-Group where this event was created. If given, it's used to determined which API-Manager to use for the lookup. Optionally, the region can be used to select the API-Manager in the correct region. For that, the parameter: API_MANAGER must be configured like so: API_MANAGER=http://default-api-manager:8075,regiona|group-1|https://manager-1:8075,group-2|https://manager-2:8075, ...."
+            required: false
+            initialType: string
+            schema:
+              type: string
+          policyName:
+            name: Policy Name
+            description: Used during local search only to figure out if Policy-Event should be indexed or not.
+            required: false
+            initialType: string
+            schema:
+              type: string
+        outputs:
+          next:
+            name: Next
+            description: Returns if the API should be ignored or not. Defaults to false.
+            context: $.
+            schema:
+              type: object
+          error:
+            name: Error
+            description: An unexpected error happened
+            context: $.error
+            schema:
+              type: object
+
+      getCustomPropertiesConfig:
+        name: Get custom properties
+        description: Returns configured custom properties configured on the API-Manager. The information is cached within the API-Builder process for 30 minutes.
+        parameters:
+          region:
+            name: API-Gateway region
+            description: "The region is optionally configured for each filebeat. If configured it is used in combination with the group-id to lookup the API at the correct API-Manager. API_MANAGER must be configured like so: API_MANAGER=https://default-manager-1:8075,us|group1|https://manager-1:8075,group-2|https://manager-2:8075, ...."
+            required: false
+            initialType: string
+            schema:
+              type: string
+          groupId:
+            name: The API-Gateway Group-ID
+            description: "The ID of the Domain-Group where this event was created. If given, it's used to determined which API-Manager to use for the lookup. Optionally, the region can be used to select the API-Manager in the correct region. For that, the parameter: API_MANAGER must be configured like so: API_MANAGER=http://default-api-manager:8075,regiona|group-1|https://manager-1:8075,group-2|https://manager-2:8075, ...."
+            required: false
+            initialType: string
+            schema:
+              type: string
+          disableCustomProperties:
+            name: Disable custom properties
+            description: Convience flag to disable loading of custom properties. This may be set by a configuration toggle.
+            required: false
+            schema:
+              default: false
+              type: boolean
+        outputs:
+          next:
+            name: Next
+            description: The configured custom properties on that API-Manager.
+            context: $.customProperties
+            schema:
+              type: object
+          error:
+            name: Error
+            description: An unexpected error happened
+            context: $.error
+            schema:
+              type: object
+
+      mergeCustomProperties:
+        name: Merge custom properties
+        description: Merges the given custom properties into desired index template mapping and compares it with the actual index-template to determine if an update of the index template is required.
+        parameters:
+          customProperties:
+            name: Custom properties
+            description: The custom properties as they have been loaded from the API-Manager
+            required: true
+            initialType: object
+            schema:
+              type: object
+          desiredIndexTemplate:
+            name: Desired Index template
+            description: The desired Elasticsearch index template containing the mappings.
+            required: true
+            initialType: object
+            schema:
+              type: object
+          actualIndexTemplate:
+            name: Actual Index template
+            description: The actual Index-Template mapping loaded from Elasticsearch used to compare if new custom properties have been added. If all custom properties are already part of the mapping, the noUpdate exit is used.
+            required: false
+            initialType: object
+            schema:
+              type: object
+          customPropertiesSettings:
+            name: Custom properties settings
+            description: "Controls if and how custom properties should be merged into the index template. See config file: elasticsearch_config/index_config.json"
+            required: false
+            schema:
+              type: object
+        outputs:
+          next:
+            name: Next
+            description: Returns the index template mapping incl. custom properties
+            context: $.mappingConfig
+            schema:
+              type: object
+          noUpdate:
+            name: No update
+            description: No update required as all custom properties are already configured in the actual index template mapping. The returned object is the index-template including custom-properties.
+            context: $.mappingConfig
+            schema:
+              type: object
+          error:
+            name: Error
+            description: An unexpected error happened
+            context: $.error
+            schema:
+              type: object
+
+      getAPIManagerConfig:
+        name: Get API-Manager configuration
+        description: Get the configuration from all configured API-Managers.
+        returns:
+          name: Next
+          description: Returns all API-Manager settings as an array.
+          context: $.apiManagerSetttings
+          schema:
+            type: array
+        throws:
+          name: Error
+          description: An unexpected error was encountered.
+          context: $.error
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+
+      getAPIManagerOrganizations:
+        name: Get API-Manager organizations
+        description: Reads organizations from one API-Manager.
+        parameters:
+          apiManager:
+            name: API-Manager connection
+            description: The connection details object to use
+            required: true
+            initialType: object
+            schema:
+              type: object
+        returns:
+          name: Next
+          description: Returns the API-Manager organizations as an array.
+          context: $.apiManagerOrganizations
+          schema:
+            type: array
+        throws:
+          name: Error
+          description: An unexpected error was encountered.
+          context: $.error
+          schema:
+            type: object
+            properties:
+              message:
+                type: string

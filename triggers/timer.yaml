@@ -1,0 +1,120 @@
+triggers:
+  setup-traffic-summary-index:
+    enabled: true
+    name: Setup Traffic-Summary Index
+    parameters:
+      interval: '14400000'
+      startImmediately: 'true'
+    invoke:
+      flow: SetupElasticsearchIndex
+      parameters:
+        config: $.config
+        env: $.env
+        indexName: apigw-traffic-summary
+  setup-traffic-details-index:
+    enabled: true
+    name: Setup Traffic-Details Index
+    parameters:
+      interval: '172800000'
+      startImmediately: 'true'
+    invoke:
+      flow: SetupElasticsearchIndex
+      parameters:
+        config: $.config
+        env: $.env
+        indexName: apigw-traffic-details
+  setup-traffic-trace-index:
+    enabled: true
+    name: Setup Traffic-Trace message index
+    parameters:
+      interval: '172800000'
+      startImmediately: 'true'
+    invoke:
+      flow: SetupElasticsearchIndex
+      parameters:
+        config: $.config
+        env: $.env
+        indexName: apigw-traffic-trace
+  setup-trace-messages-index:
+    enabled: true
+    name: Setup Trace-Messages Index
+    parameters:
+      interval: '172800000'
+      startImmediately: 'true'
+    invoke:
+      flow: SetupElasticsearchIndex
+      parameters:
+        config: $.config
+        env: $.env
+        indexName: apigw-trace-messages
+  setup-apigw-monitoring-index:
+    enabled: true
+    name: Setup API-GW Monitoring Index
+    parameters:
+      interval: '172800000'
+      startImmediately: 'true'
+    invoke:
+      flow: SetupElasticsearchIndex
+      parameters:
+        config: $.config
+        env: $.env
+        indexName: apigw-monitoring
+  setup-domainaudit-index:
+    enabled: true
+    name: Setup Domain-Audit Index
+    parameters:
+      interval: '172800000'
+      startImmediately: 'true'
+    invoke:
+      flow: SetupElasticsearchIndex
+      parameters:
+        config: $.config
+        env: $.env
+        indexName: apigw-domainaudit
+  setup-management-kpis-index:
+    enabled: true
+    name: Setup Management-KPIs Index
+    parameters:
+      interval: '172800000'
+      startImmediately: 'true'
+    invoke:
+      flow: SetupElasticsearchIndex
+      parameters:
+        config: $.config
+        env: $.env
+        indexName: apigw-management-kpis
+  update-rollover-alias:
+    enabled: true
+    name: Update Index Rollover-Alias
+    parameters:
+      interval: '600000'
+      startImmediately: 'false'
+    invoke:
+      flow: apim-elk-setup-update-rollover-alias
+      parameters:
+        config: $.config
+        env: $.env
+  setup-traffic-summary-transform:
+    name: Setup Traffic-Summary Transform
+    parameters:
+      interval: '3600000'
+      startImmediately: 'false'
+    enabled: true
+    invoke:
+      flow: SetupElasticsearchTransform
+      parameters:
+        config: $.config
+        env: $.env
+        indexName: apigw-traffic-summary
+  index-management-kpis:
+    name: Index Management KPIs
+    parameters:
+      interval: $.config.managementKPIsInterval
+      startImmediately: 'true'
+    enabled: true
+    invoke:
+      flow: IndexAPI-ManagementKPIs
+      parameters:
+        config: $.config
+        env: $.env
+        request: $

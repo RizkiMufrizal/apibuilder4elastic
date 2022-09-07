@@ -1,0 +1,787 @@
+{
+	"schemaVersion": "4",
+	"info": {
+		"name": "Traffic-Monitor API - Search",
+		"description": "Used by Traffic monitor to search for APIs (Table overview)"
+	},
+	"parameter": {
+		"properties": {
+			"params": {
+				"type": "object",
+				"description": "The parameters from the endpoint."
+			},
+			"request": {
+				"type": "object",
+				"description": "The HTTP request."
+			},
+			"config": {
+				"type": "object",
+				"description": "The service's configuration"
+			},
+			"env": {
+				"type": "object",
+				"description": "The host OS environment"
+			}
+		},
+		"additionalProperties": false,
+		"required": [
+			"params",
+			"request",
+			"config",
+			"env"
+		]
+	},
+	"start": "javascript.3",
+	"nodes": {
+		"http.1": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Set Search response",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "200",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.response",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"elasticsearch.1": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-elasticsearch/elasticsearch",
+			"name": "Query Elasticsearch",
+			"method": "search",
+			"parameters": [
+				{
+					"name": "index",
+					"type": "jsonpath",
+					"value": "$.index",
+					"metaName": "Index",
+					"metaDescription": "Comma-separated list or wildcard expression of index names used to limit the request."
+				},
+				{
+					"name": "sort",
+					"type": "string",
+					"value": "\"@timestamp:desc\"",
+					"metaName": "Sort",
+					"metaDescription": "A comma-separated list of <field>:<direction> pairs."
+				},
+				{
+					"name": "size",
+					"type": "jsonpath",
+					"value": "$.params.count",
+					"metaName": "Size",
+					"metaDescription": "Defines the number of hits to return. Defaults to 10."
+				},
+				{
+					"name": "query",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.query",
+					"metaName": "Query",
+					"metaDescription": "Defines the search definition using the Query DSL. Learn more: https://www.elastic.co/guide/en/elasticsearch/reference/7.x/query-dsl.html"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": ["javascript.1"],
+					"context": "$.elasticsearch.result"
+				},
+				"noResult": {
+					"routes": ["javascript.1"],
+					"context": "$.elasticsearch.result"
+				},
+				"missingIndex": {
+					"routes": [],
+					"context": "$.error"
+				},
+				"error": {
+					"routes": [],
+					"context": "$.error"
+				}
+			},
+			"metaMethod": "Search"
+		},
+		"javascript.1": {
+			"type": "nodehandler://@axway/api-builder-plugin-fn-javascript/javascript",
+			"name": "Format result",
+			"method": "Execute",
+			"parameters": [
+				{
+					"name": "data",
+					"type": "jsonpath",
+					"value": "$",
+					"metaName": "Data",
+					"metaDescription": "The value to apply as the `data` argument of the JavaScript code. For objects and arrays, `data` is passed by reference."
+				},
+				{
+					"name": "code",
+					"type": "string",
+					"value": "\"var result = {};\\n  var hits = data.elasticsearch.result.body.hits.hits;\\n  var protocol = data.params.protocol;\\n  result.processId = \\\"\\\";\\n  result.data = [];\\n  hits.map(function(entry) {\\n    var dataObject = {};\\n    var _source = entry._source;\\n    dataObject.correlationId = _source.correlationId;\\n    dataObject.timestamp = Date.parse(_source['@timestamp']);\\n    if(_source.serviceContext) {\\n      dataObject.serviceName = _source.serviceContext.service;\\n      dataObject.operation = _source.serviceContext.method;\\n    }\\n    dataObject.type = protocol;\\n    switch (protocol) {\\n      case \\\"http\\\":\\n        formatHttpFields(dataObject, _source);\\n        break;\\n      case \\\"fileTransfer\\\":\\n        formatFiletransferFields(dataObject, _source);\\n        break;\\n      case \\\"jms\\\":\\n        formatJMSFields(dataObject, _source);\\n        break;\\n    }\\n    result.data.push(dataObject);\\n  });\\n  \\n  function formatHttpFields(dataObject, _source) {    \\n      if(!_source.http.sslSubject) {\\n        _source.http.sslSubject = \\\"null\\\";\\n      }\\n      dataObject.statustext = _source.http.statusText;\\n      dataObject.method = _source.http.method;\\n      dataObject.status = _source.http.status;\\n      dataObject.wafStatus = _source.http.wafStatus;\\n      dataObject.subject = _source.http.authSubjectId;\\n      dataObject.sslsubject = _source.http.sslSubject;\\n      dataObject.localPort = _source.http.localPort;\\n      dataObject.uri = _source.http.uri;\\n      dataObject.vhost = _source.http.vhost;\\n      dataObject.duration = _source.duration;\\n      dataObject.finalStatus = _source.finalStatus;\\n      dataObject.bytesReceived = _source.http.bytesReceived;\\n      dataObject.bytesSent = _source.http.bytesSent;\\n      dataObject.remoteName = _source.http.remoteName;\\n      dataObject.remoteAddr = _source.http.remoteAddr;\\n      dataObject.remotePort = _source.http.remotePort;\\n      dataObject.localAddr = _source.http.localAddr;\\n      dataObject.localPort = _source.http.localPort;\\n      dataObject.leg = 0;\\n  }\\n  \\n  function formatFiletransferFields(dataObject, _source) {\\n      dataObject.remoteAddr = _source.fileTransfer.remoteAddr;\\n      dataObject.uploadFile = _source.fileTransfer.uploadFile;\\n      dataObject.direction = _source.fileTransfer.direction;\\n      dataObject.servicetype = _source.fileTransfer.serviceType;\\n      dataObject.size = _source.fileTransfer.size;\\n      dataObject.duration = _source.duration;\\n      dataObject.subject = _source.fileTransfer.authSubjectId;\\n      dataObject.finalStatus = _source.finalStatus;\\n  }\\n  \\n  function formatJMSFields(dataObject, _source) {\\n    dataObject.jmsMessageID = _source.jms.jmsMessageID;\\n    dataObject.jmsCorrelationID = _source.jms.jmsCorrelationID;\\n    dataObject.jmsDestination = _source.jms.jmsDestination;\\n    dataObject.jmsProviderURL = _source.jms.jmsProviderURL;\\n    dataObject.jmsDeliveryMode = _source.jms.jmsDeliveryMode;\\n    dataObject.jmsPriority = _source.jms.jmsPriority;\\n    dataObject.jmsReplyTo = _source.jms.jmsReplyTo;\\n    dataObject.jmsRedelivered = _source.jms.jmsRedelivered;\\n    dataObject.jmsTimestamp = _source.jms.jmsTimestamp;\\n    dataObject.jmsExpiration = _source.jms.jmsExpiration;\\n    dataObject.jmsType = _source.jms.jmsType;\\n    dataObject.jmsStatus = _source.jms.jmsStatus;\\n    dataObject.jmsStatusText = _source.jms.jmsStatusText;\\n    dataObject.leg = 0;\\n    dataObject.duration = _source.duration;\\n    dataObject.subject = _source.jms.authSubjectId;\\n    dataObject.finalStatus = _source.finalStatus;\\n  }\\n\\n  \\n  return result;\"",
+					"metaName": "Code",
+					"metaDescription": "A JavaScript function body. Supports `await` and returning promises. `data` is the value of the Data parameter. `logger` is the API Builder logger. See the docs for more info: https://docs.axway.com/bundle/API_Builder_4x_allOS_en/page/javascript_flow-node.html"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [
+						"http.1"
+					],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Execute"
+		},
+		"axway-api-management.1": {
+			"type": "nodehandler://api-builder-plugin-axway-api-management/axway-api-management",
+			"name": "Lookup current user",
+			"method": "lookupCurrentUser",
+			"parameters": [
+				{
+					"name": "requestHeaders",
+					"type": "jsonpath",
+					"value": "$.request.headers",
+					"metaName": "Request Headers",
+					"metaDescription": "The request headers are used to lookup the current users based on the current session cookie (VIDUSR)."
+				},
+				{
+					"name": "getApiManagerUser",
+					"type": "jsonpath",
+					"value": "$.authzConfig.getApiManagerUser",
+					"metaName": "Get the API-Manager user?",
+					"metaDescription": "If set to false, the flow-node does not try to lookup the user on the API-Manager. Set it to false, when for instance user authorization is disabled as there might be no belonging user configured in the API-Manager."
+				},
+				{
+					"name": "unrestrictedPermissions",
+					"type": "jsonpath",
+					"value": "$.config.unrestrictedPermissions",
+					"metaName": "Unrestricted Permissions",
+					"metaDescription": "A comma separated list of the permission(s) to check, if a user should get unrestricted traffic view access. For example: \"logs\" or \"logs,mgmt\". The second option requires are user to have both permissions to get the unrestricted view. Defaults to adminusers_modify."
+				},
+				{
+					"name": "region",
+					"type": "jsonpath",
+					"value": "$.params.region",
+					"metaName": "Region",
+					"metaDescription": "If the region is set, the corresponding admin node manager is determined based on this region. If no region is set, then the default Admin-Node-Manager is used."
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.user",
+					"routes": [
+						"axway-api-management.2"
+					],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [
+						"http.4"
+					],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Lookup current user"
+		},
+		"condition.1": {
+			"type": "nodehandler://axway-flow/condition",
+			"name": "Is unrestricted?",
+			"method": "equals",
+			"parameters": [
+				{
+					"name": "source",
+					"type": "jsonpath",
+					"value": "$.user.gatewayManager.isUnrestricted",
+					"metaName": "Source",
+					"metaDescription": "The input to test."
+				},
+				{
+					"name": "value",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Value",
+					"metaDescription": "The value to test input against."
+				}
+			],
+			"outputs": {
+				"true": {
+					"routes": [
+						"traffic-monitor-api-utils.1"
+					],
+					"context": "$.equals",
+					"metaName": "True"
+				},
+				"false": {
+					"routes": [
+						"http.2"
+					],
+					"context": "$.equals",
+					"metaName": "False"
+				}
+			},
+			"metaMethod": "Equals"
+		},
+		"http.2": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "No access to other protocols",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "403",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "object",
+					"value": "{\"processId\":\"\", \"data\":[ \n]}",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"http.3": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Protocol not implemented",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "501",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "object",
+					"value": "{\"message\": \"Protocol is not yet implemented\"}",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"http.4": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "HTTP 500",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "500",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"http.5": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "HTTP 500",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "500",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"utils.1": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-utils/utils",
+			"name": "Is not supported protocol?",
+			"method": "switchCase",
+			"parameters": [
+				{
+					"name": "source",
+					"type": "jsonpath",
+					"value": "$.params.protocol",
+					"metaName": "Source",
+					"metaDescription": "The input to test."
+				},
+				{
+					"name": "notMatchDefault",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "No Match as default",
+					"metaDescription": "If none of the values matches and this is true, the default exit is used. Default is false."
+				},
+				{
+					"name": "value1",
+					"type": "string",
+					"value": "\"websock\"",
+					"metaName": "Value 1",
+					"metaDescription": "The first value to test input against. If this matches exit 1 is used."
+				}
+			],
+			"outputs": {
+				"1": {
+					"context": "$.source",
+					"routes": [
+						"http.3"
+					],
+					"metaName": "1"
+				},
+				"2": {
+					"context": "$.source",
+					"routes": [],
+					"metaName": "2"
+				},
+				"3": {
+					"context": "$.source",
+					"routes": [],
+					"metaName": "3"
+				},
+				"4": {
+					"context": "$.source",
+					"routes": [],
+					"metaName": "4"
+				},
+				"5": {
+					"context": "$.source",
+					"routes": [],
+					"metaName": "5"
+				},
+				"default": {
+					"context": "$.source",
+					"routes": [
+						"condition.2"
+					],
+					"metaName": "Default"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Switch case"
+		},
+		"traffic-monitor-api-utils.1": {
+			"type": "nodehandler://api-builder-plugin-traffic-monitor-api-utils/traffic-monitor-api-utils",
+			"name": "Handle filter fields",
+			"method": "handleFilterFields",
+			"parameters": [
+				{
+					"name": "params",
+					"type": "jsonpath",
+					"value": "$.params",
+					"metaName": "Params",
+					"metaDescription": "The object must contain the given request parameters."
+				},
+				{
+					"name": "serviceID",
+					"type": "jsonpath",
+					"value": "$.params.serviceID",
+					"metaName": "ServiceId",
+					"metaDescription": "The serviceId which is part of the request and given as a path parameter (r/service/instance-2/ops/)"
+				},
+				{
+					"name": "gatewayTopology",
+					"type": "jsonpath",
+					"value": "$.gatewayTopology",
+					"metaName": "API-Gateway Topology",
+					"metaDescription": "The API-Gateway topology as read by flow-node: axway-api-management->lookupTopology"
+				},
+				{
+					"name": "region",
+					"type": "jsonpath",
+					"value": "$.params.region"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.elasticsearch.query",
+					"routes": [
+						"authorization.3"
+					],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [
+						"http.5"
+					],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Handle filter fields"
+		},
+		"javascript.3": {
+			"type": "nodehandler://@axway/api-builder-plugin-fn-javascript/javascript",
+			"name": "Define index for search",
+			"method": "Execute",
+			"parameters": [
+				{
+					"name": "data",
+					"type": "jsonpath",
+					"value": "$",
+					"metaName": "Data",
+					"metaDescription": "The value to apply as the `data` argument of the JavaScript code. For objects and arrays, `data` is passed by reference."
+				},
+				{
+					"name": "code",
+					"type": "string",
+					"value": "\"// Perhaps there is a region given\\n  let region = data.params.region;\\n  // Overview screen (Traffic-Details table) \\n  // should also include the apigw-traffic-errors documents\\n  let index = 'apigw-traffic-summary';\\n  // Atach the region if given\\n  if(region) {\\n    index = `${index}-${region.toLowerCase()}`;\\n  }\\n  index = `${index}-*`;\\n  // Check, if there is an index name to test configured (this is set by the tests)\\n  if(data.config.testElasticIndex) {\\n    index = data.config.testElasticIndex;\\n    if(region) {\\n      index = index.replace(\\\"%REGION%\\\", region.toLowerCase());\\n    }\\n  }\\n  // Define the protocol default (mainly for tests, as they are not sending the default)\\n  if(data.params.protocol == undefined) {\\n    data.params.protocol = 'http';\\n  }\\n  return index;\"",
+					"metaName": "Code",
+					"metaDescription": "A JavaScript function body. Supports `await` and returning promises. `data` is the value of the Data parameter. `logger` is the API Builder logger. See the docs for more info: https://docs.axway.com/bundle/API_Builder_4x_allOS_en/page/javascript_flow-node.html"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.index",
+					"routes": [
+						"authorization.4"
+					],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Execute"
+		},
+		"condition.2": {
+			"type": "nodehandler://axway-flow/condition",
+			"name": "Is HTTP?",
+			"method": "equals",
+			"parameters": [
+				{
+					"name": "source",
+					"type": "jsonpath",
+					"value": "$.params.protocol",
+					"metaName": "Source",
+					"metaDescription": "The input to test."
+				},
+				{
+					"name": "value",
+					"type": "string",
+					"value": "\"http\"",
+					"metaName": "Value",
+					"metaDescription": "The value to test input against."
+				}
+			],
+			"outputs": {
+				"true": {
+					"routes": [
+						"traffic-monitor-api-utils.1"
+					],
+					"context": "$.equals",
+					"metaName": "True"
+				},
+				"false": {
+					"routes": [
+						"condition.1"
+					],
+					"context": "$.equals",
+					"metaName": "False"
+				}
+			},
+			"metaMethod": "Equals"
+		},
+		"authorization.1": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "Add Org-Filter",
+			"method": "addApiManagerOrganizationFilter",
+			"parameters": [
+				{
+					"name": "elasticQuery",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.query",
+					"metaName": "Elasticsearch query",
+					"metaDescription": "The Elasticsearch query that should be enhanced with a filter."
+				},
+				{
+					"name": "user",
+					"type": "jsonpath",
+					"value": "$.user",
+					"metaName": "API-Manager user",
+					"metaDescription": "User object looked up at the API-Manager"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elasticsearch.1"
+					],
+					"context": "$.elasticsearch.query",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.5"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "API-Manager-Org Authorization"
+		},
+		"authorization.2": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "External Authorization filter 1",
+			"method": "addExtHTTPAuthzFilter",
+			"parameters": [
+				{
+					"name": "user",
+					"type": "jsonpath",
+					"value": "$.user",
+					"metaName": "API-Manager user",
+					"metaDescription": "User object that contains the loginName property"
+				},
+				{
+					"name": "elasticQuery",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.query",
+					"metaName": "Elasticsearch query",
+					"metaDescription": "The Elasticsearch query that should be enhanced with a filter."
+				},
+				{
+					"name": "restrictionField",
+					"type": "jsonpath",
+					"value": "$.authzConfig.restrictionField",
+					"metaName": "Restriction field",
+					"metaDescription": "The field on which the restriction should be applied. For instance a custom property."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elasticsearch.1"
+					],
+					"context": "$.elasticsearch.query",
+					"metaName": "Next"
+				},
+				"noAccess": {
+					"routes": [
+						"http.6"
+					],
+					"context": "$.noAccess",
+					"metaName": "No access"
+				},
+				"error": {
+					"routes": [
+						"http.5"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "External HTTP-Based Authorization"
+		},
+		"authorization.3": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "Switch on Authorization",
+			"method": "switchOnAuthZ",
+			"parameters": [],
+			"outputs": {
+				"org": {
+					"routes": [
+						"authorization.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Organization"
+				},
+				"extHttp": {
+					"routes": [
+						"authorization.2"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Ext-HTTP"
+				},
+				"skip": {
+					"routes": [
+						"elasticsearch.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Skip"
+				},
+				"error": {
+					"routes": [
+						"http.5"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Switch on Authorization"
+		},
+		"http.6": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "No Access",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "403",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "object",
+					"value": "{\"processId\":\"\", \"data\":[ \n]}",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"authorization.4": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "Get AuthZ-Config",
+			"method": "switchOnAuthZ",
+			"parameters": [],
+			"outputs": {
+				"skip": {
+					"routes": [
+						"axway-api-management.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Skip"
+				},
+				"org": {
+					"routes": [
+						"axway-api-management.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Organization"
+				},
+				"extHttp": {
+					"routes": [
+						"axway-api-management.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Ext-HTTP"
+				},
+				"error": {
+					"routes": [
+						"http.4"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Switch on Authorization"
+		},
+		"axway-api-management.2": {
+			"type": "nodehandler://api-builder-plugin-axway-api-management/axway-api-management",
+			"name": "Lookup topology",
+			"method": "lookupTopology",
+			"parameters": [
+				{
+					"name": "requestHeaders",
+					"type": "jsonpath",
+					"value": "$.request.headers",
+					"metaName": "Request Headers",
+					"metaDescription": "The request headers are used to lookup the topology using the currently logged in user."
+				},
+				{
+					"name": "region",
+					"type": "jsonpath",
+					"value": "$.params.region",
+					"metaName": "Region",
+					"metaDescription": "If the region is set, the corresponding admin node manager is determined based on this region. If no region is set, then the default Admin-Node-Manager is used."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"utils.1"
+					],
+					"context": "$.gatewayTopology",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.4"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Lookup topology"
+		}
+	}
+}

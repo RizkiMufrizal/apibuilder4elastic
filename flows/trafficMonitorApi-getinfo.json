@@ -1,0 +1,654 @@
+{
+	"schemaVersion": "4",
+	"info": {
+		"name": "Traffic-Monitor API - GetInfo",
+		"description": "Used by Traffic monitor to display Request/Responses"
+	},
+	"parameter": {
+		"properties": {
+			"params": {
+				"type": "object",
+				"description": "The parameters from the endpoint."
+			},
+			"request": {
+				"type": "object",
+				"description": "The HTTP request."
+			},
+			"config": {
+				"type": "object",
+				"description": "The service's configuration"
+			},
+			"env": {
+				"type": "object",
+				"description": "The host OS environment"
+			}
+		},
+		"additionalProperties": false,
+		"required": [
+			"params",
+			"request",
+			"config",
+			"env"
+		]
+	},
+	"start": "authorization.1",
+	"nodes": {
+		"javascript.1": {
+			"type": "nodehandler://@axway/api-builder-plugin-fn-javascript/javascript",
+			"name": "Define GetInfo Index",
+			"method": "Execute",
+			"parameters": [
+				{
+					"name": "data",
+					"type": "jsonpath",
+					"value": "$",
+					"metaName": "data",
+					"metaDescription": "The value to apply as the `data` argument to the JavaScript code. For objects and arrays, `data` is passed by reference."
+				},
+				{
+					"name": "code",
+					"type": "string",
+					"value": "\"// Perhaps there is a region given\\n  let region = data.params.region;\\n  \\n  let index = 'apigw-traffic-details';\\n  // Atach the region if given\\n  if(region) {\\n    index = `${index}-${region.toLowerCase()}`;\\n  }\\n  index = `${index}-*`;\\n  \\n  if(data.config.testElasticIndex) {\\n    index = data.config.testElasticIndex;\\n  }\\n  \\n  return index;\"",
+					"metaName": "code",
+					"metaDescription": "A JavaScript function body. Supports `await` and returning promises."
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.index",
+					"routes": [
+						"javascript.2"
+					],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [
+						"http.5"
+					],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Execute"
+		},
+		"javascript.2": {
+			"type": "nodehandler://@axway/api-builder-plugin-fn-javascript/javascript",
+			"name": "Check GetInfo Params",
+			"method": "Execute",
+			"parameters": [
+				{
+					"name": "data",
+					"type": "jsonpath",
+					"value": "$",
+					"metaName": "data",
+					"metaDescription": "The value to apply as the `data` argument to the JavaScript code. For objects and arrays, `data` is passed by reference."
+				},
+				{
+					"name": "code",
+					"type": "string",
+					"value": "\"//only json is supported. \\n  //If param format is skipped automatically json is returned\\n\\n  if(data.params.format != undefined && data.params.format != 'json') {\\n    throw {\\n      name: \\\"unknown format exception\\\",\\n      message: \\\"unknown format\\\"\\n    };\\n  }\\n\\n  return data.params;\"",
+					"metaName": "code",
+					"metaDescription": "A JavaScript function body. Supports `await` and returning promises."
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.params",
+					"routes": [
+						"traffic-monitor-api-utils.2"
+					],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [
+						"http.5"
+					],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Execute"
+		},
+		"elasticsearch.1": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-elasticsearch/elasticsearch",
+			"name": "Search GetInfo",
+			"method": "search",
+			"parameters": [
+				{
+					"name": "index",
+					"type": "jsonpath",
+					"value": "$.index",
+					"metaName": "Index",
+					"metaDescription": "Comma-separated list or wildcard expression of index names used to limit the request."
+				},
+				{
+					"name": "query",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.query",
+					"metaName": "Query",
+					"metaDescription": "Defines the search definition using the Query DSL. Learn more: https://www.elastic.co/guide/en/elasticsearch/reference/7.x/query-dsl.html"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": ["traffic-monitor-api-utils.1"],
+					"context": "$.elasticsearch.result"
+				},
+				"noResult": {
+					"routes": ["traffic-monitor-api-utils.1"],
+					"context": "$.elasticsearch.result"
+				},
+				"missingIndex": {
+					"routes": ["http.1"],
+					"context": "$.error"
+				},
+				"error": {
+					"routes": ["http.1"],
+					"context": "$.error"
+				}
+			},
+			"metaMethod": "Search"
+		},
+		"http.2": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Response GetInfo",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "200",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.result",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"http.1": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Set HTTP 500 Response",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "500",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"axway-api-management.1": {
+			"type": "nodehandler://api-builder-plugin-axway-api-management/axway-api-management",
+			"name": "Lookup current user",
+			"method": "lookupCurrentUser",
+			"parameters": [
+				{
+					"name": "requestHeaders",
+					"type": "jsonpath",
+					"value": "$.request.headers",
+					"metaName": "Request Headers",
+					"metaDescription": "The request headers are used to lookup the current users based on the current session cookie (VIDUSR)."
+				},
+				{
+					"name": "getApiManagerUser",
+					"type": "jsonpath",
+					"value": "$.authzConfig.getApiManagerUser",
+					"metaName": "Get the API-Manager user?",
+					"metaDescription": "If set to false, the flow-node does not tries to lookup the user on the API-Manager. Set it to false, when for instance user authorization is disabled as there might be no belonging user configured in the API-Manager."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"axway-api-management.2"
+					],
+					"context": "$.user",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.5"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Lookup current user"
+		},
+		"traffic-monitor-api-utils.1": {
+			"type": "nodehandler://api-builder-plugin-traffic-monitor-api-utils/traffic-monitor-api-utils",
+			"name": "Format GetInfo",
+			"method": "getTransactionElementLegInfo",
+			"parameters": [
+				{
+					"name": "detailsParam",
+					"type": "jsonpath",
+					"value": "$.params.details",
+					"metaName": "Include details",
+					"metaDescription": "Should details returned or not (1 or 0)"
+				},
+				{
+					"name": "rheadersParam",
+					"type": "jsonpath",
+					"value": "$.params.rheaders",
+					"metaName": "Include Received-Headers",
+					"metaDescription": "Should Received-Headers returned or not (1 or 0)"
+				},
+				{
+					"name": "legIdParam",
+					"type": "jsonpath",
+					"value": "$.params.legID",
+					"metaName": "Leg-ID",
+					"metaDescription": "The number of the leg to be returned or * for all legs."
+				},
+				{
+					"name": "correlationId",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.result.body.hits.hits[0]._source.correlationId",
+					"metaName": "CorrelationId",
+					"metaDescription": "The correlation ID of the request. It needs to be added to the transaction information"
+				},
+				{
+					"name": "timestamp",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.result.body.hits.hits[0]._source['@timestamp']",
+					"metaName": "Request timestamp",
+					"metaDescription": "The timestamp of the request. It needs to be added to the transaction information"
+				},
+				{
+					"name": "transactionElements",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.result.body.hits.hits[0]._source.transactionElements",
+					"metaName": "TransactionElements",
+					"metaDescription": "The transaction element object returned by Elasticsearch traffic details index containing the individual Legs. The legs can contain HTTP or other protocols like JMS."
+				},
+				{
+					"name": "sheadersParam",
+					"type": "jsonpath",
+					"value": "$.params.sheaders",
+					"metaName": "Include Sent-Headers",
+					"metaDescription": "Should Sent-Headers returned or not (1 or 0)"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"http.2"
+					],
+					"context": "$.result",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.1"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Get Leg info"
+		},
+		"authorization.1": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "Get AuthZ-Config",
+			"method": "switchOnAuthZ",
+			"parameters": [],
+			"outputs": {
+				"skip": {
+					"routes": [
+						"axway-api-management.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Skip"
+				},
+				"org": {
+					"routes": [
+						"axway-api-management.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Organization"
+				},
+				"extHttp": {
+					"routes": [
+						"axway-api-management.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Ext-HTTP"
+				},
+				"error": {
+					"routes": [
+						"http.5"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Switch on Authorization"
+		},
+		"traffic-monitor-api-utils.2": {
+			"type": "nodehandler://api-builder-plugin-traffic-monitor-api-utils/traffic-monitor-api-utils",
+			"name": "Create GetInfo query",
+			"method": "createCircuitPathQuery",
+			"parameters": [
+				{
+					"name": "authzConfig",
+					"type": "jsonpath",
+					"value": "$.authzConfig",
+					"metaName": "Authorization configuration",
+					"metaDescription": "The authorization configuration object returned from Get AuthZ Config"
+				},
+				{
+					"name": "params",
+					"type": "jsonpath",
+					"value": "$.params",
+					"metaName": "Params",
+					"metaDescription": "The object must contain the given request parameters."
+				},
+				{
+					"name": "user",
+					"type": "jsonpath",
+					"value": "$.user",
+					"metaName": "User",
+					"metaDescription": "The user object using the API-Gateway Traffic-Monitor"
+				},
+				{
+					"name": "gatewayTopology",
+					"type": "jsonpath",
+					"value": "$.gatewayTopology"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"authorization.2"
+					],
+					"context": "$.elasticsearch.query",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.5"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Create circuit path query"
+		},
+		"authorization.2": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "Switch on Authorization",
+			"method": "switchOnAuthZ",
+			"parameters": [],
+			"outputs": {
+				"skip": {
+					"routes": [
+						"elasticsearch.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Skip"
+				},
+				"org": {
+					"routes": [
+						"authorization.3"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Organization"
+				},
+				"extHttp": {
+					"routes": [
+						"authorization.4"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Ext-HTTP"
+				},
+				"error": {
+					"routes": [],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Switch on Authorization"
+		},
+		"authorization.3": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "API-Manager-Org Authorization",
+			"method": "addApiManagerOrganizationFilter",
+			"parameters": [
+				{
+					"name": "user",
+					"type": "jsonpath",
+					"value": "$.user",
+					"metaName": "API-Manager user",
+					"metaDescription": "User object looked up at the API-Manager"
+				},
+				{
+					"name": "elasticQuery",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.query",
+					"metaName": "Elasticsearch query",
+					"metaDescription": "The Elasticsearch query that should be enhanced with a filter."
+				},
+				{
+					"name": "indexProperty",
+					"type": "string",
+					"value": "\"transactionSummary.serviceContext.apiOrg\"",
+					"metaName": "Index property",
+					"metaDescription": "The name of the Elasticsearch property within the index to restrict the query on. If not given: serviceContext.apiOrg is used."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elasticsearch.1"
+					],
+					"context": "$.elasticsearch.query",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.4"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "API-Manager-Org Authorization"
+		},
+		"authorization.4": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "External HTTP-Based Authorization",
+			"method": "addExtHTTPAuthzFilter",
+			"parameters": [
+				{
+					"name": "elasticQuery",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.query",
+					"metaName": "Elasticsearch query",
+					"metaDescription": "The Elasticsearch query that should be enhanced with a filter."
+				},
+				{
+					"name": "user",
+					"type": "jsonpath",
+					"value": "$.user",
+					"metaName": "API-Manager user",
+					"metaDescription": "User object that contains the loginName property"
+				},
+				{
+					"name": "restrictionField",
+					"type": "jsonpath",
+					"value": "$.authzConfig.detailedRestrictionField",
+					"metaName": "Restriction field",
+					"metaDescription": "The field on which the restriction should be applied. For instance a custom property."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elasticsearch.1"
+					],
+					"context": "$.elasticsearch.query",
+					"metaName": "Next"
+				},
+				"noAccess": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.noAccess",
+					"metaName": "No access"
+				},
+				"error": {
+					"routes": [
+						"http.4"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "External HTTP-Based Authorization"
+		},
+		"http.3": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "No access",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "403",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.noAccess",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"http.4": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Set HTTP 500 Response",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "500",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"http.5": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Set HTTP 500 Response",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "500",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"axway-api-management.2": {
+			"type": "nodehandler://api-builder-plugin-axway-api-management/axway-api-management",
+			"name": "Lookup topology",
+			"method": "lookupTopology",
+			"parameters": [
+				{
+					"name": "requestHeaders",
+					"type": "jsonpath",
+					"value": "$.request.headers"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"javascript.1"
+					],
+					"context": "$.gatewayTopology"
+				},
+				"error": {
+					"routes": [
+						"http.5"
+					],
+					"context": "$.error"
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,175 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "API-Management Lookup API",
+    "version": "1.0",
+    "description": "This API is some kind of helper API to allow Logstash to enrich the data inserted into ElasticSearch. Initially this API was required to lookup the API being called to get the organization of this API",
+    "license": {
+      "name": "Apache 2.0"
+    },
+    "contact": {
+      "name": "Chris Wiechmann",
+      "email": "cwiechmann@axway.com"
+    }
+  },
+  "host": "example.com",
+  "paths": {
+    "/lookup/api": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Returned if the retrieved API-Details or an API-Details for an unknown API."
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "parameters": [
+          {
+            "type": "string",
+            "in": "query",
+            "name": "apiPath",
+            "description": "The exposed path of the API to be looked up"
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "apiName",
+            "description": "The name of the API to look up at the API-Manager"
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "operationId",
+            "description": "If given the operationId (e.g. getUserByName) is also used to identify the correct API"
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "groupId",
+            "description": "The ID of the Domain-Group where this event was created. It's used to determined which API-Manager to use for the API-Details Lookup.\nIf the parameter: API_MANAGER is configured with multiple groupIds this groupId is used to determine which API-Manager to use.\nAPI_MANAGER=group-5#https://manager-1:8075, group-2#https://manager-2:8075, ...."
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "region",
+            "description": "The region can be specified optionally. Based on the region, together with the Group-ID, the correct API manager for the lookup is determined. This must be specified in the API_MANAGER parameter."
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "correlationId",
+            "description": "The API-Gateway correlationId - Not used by the endpoint and for back-reference only."
+          }
+        ],
+        "summary": "Looks up an API based on the API-Path",
+        "description": "This endpoint returns based on parameters such as the API name, API path some other required additional API details, like configured Security, Policies, etc. These are either based on the API manager and in a locally configured file. \nThe locally configured file takes precedence over using the API manager to retrieve the details.\nFirst, the specified API path is used to look up the API details locally, and if the API is not found there, then the API name is also needed, since the specified API path (e.g. /v1/my/api/some/data/hello) does not necessarily have to match the API registered in the API manager. Then all APIs with the name are searched for and additionally it is checked that the start of the API path matches the API found and searched for.",
+        "operationId": "lookupApi",
+        "x-flow": "lookupAPI-search"
+      },
+      "parameters": []
+    },
+    "/lookup/api/ignore": {
+      "get": {
+        "summary": "Ignore this API/Document?",
+        "tags": [],
+        "operationId": "lookup-api-ignore",
+        "description": "Provides information if the API should be indexed or not.",
+        "parameters": [
+          {
+            "type": "string",
+            "in": "query",
+            "name": "region",
+            "description": "The region this API was executed. Depending on the region different configuration files are used."
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "groupId",
+            "description": "The ID of the Domain-Group where this event was created. It's used to determined which API-Manager to use for the API-Details Lookup.If the parameter: API_MANAGER is configured with multiple groupIds this groupId is used to determine which API-Manager to use.API_MANAGER=group-5#https://manager-1:8075, group-2#https://manager-2:8075, ...."
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "description": "Policy-Name part of the event used to determine if a policy-event should be indexed or not.",
+            "name": "policyName"
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "apiPath",
+            "description": "The API-Path used to lookup the configuration of this API."
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "correlationId",
+            "description": "The API-Gateway correlationId - Not used by the endpoint and for back-reference only."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "x-flow": "lookupAPI-index-api"
+      },
+      "parameters": []
+    },
+    "/lookup/application": {
+      "get": {
+        "summary": "Looks up an application",
+        "tags": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "operationId": "Lookup-Application",
+        "parameters": [
+          {
+            "type": "string",
+            "in": "query",
+            "name": "groupId",
+            "description": "The region can be specified optionally. Based on the region, together with the Group-ID, the correct API manager for the lookup is determined. This must be specified in the API_MANAGER parameter."
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "region",
+            "description": "The region can be specified optionally. Based on the region, together with the Group-ID, the correct API manager for the lookup is determined. This must be specified in the API_MANAGER parameter."
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "applicationId",
+            "description": "ID of the application to lookup",
+            "required": true
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "correlationId",
+            "description": "The API-Gateway correlationId - Not used by the endpoint and for back-reference only."
+          }
+        ],
+        "description": "Looks up an application based on the given application ID",
+        "x-flow": "lookupAPI-Lookup-Application"
+      },
+      "parameters": []
+    }
+  },
+  "basePath": "/elk/v1/api"
+}

@@ -1,0 +1,110 @@
+version: '3.7'
+services:
+  # Is receiving events from Filebeat and does pre-processing
+  # https://github.com/elastic/logstash-docker/blob/master/build/logstash/env2yaml/env2yaml.go
+  logstash:
+    image: docker.elastic.co/logstash/logstash:${ELASTIC_VERSION}
+    # This custom entrypoint is required to adjust the variable ELASTICSEARCH_HOSTS from Comma to Space separated
+    entrypoint: /usr/share/logstash/scripts/logstash-custom-entrypoint.sh
+    container_name: logstash
+    environment:
+      - node.name=${LOGSTASH_NODE_NAME:-Logstash-1}
+      - xpack.monitoring.enabled=${SELF_MONITORING_ENABLED:-true}
+      - xpack.monitoring.elasticsearch.ssl.certificate_authority=${ELASTICSEARCH_CA}
+      - xpack.monitoring.elasticsearch.ssl.verification_mode="${LOGSTASH_ELASTICSEARCH_SSL_VERIFICATIONMODE:-certificate}"
+      - xpack.monitoring.elasticsearch.hosts=[${ELASTICSEARCH_HOSTS}]
+      - xpack.monitoring.elasticsearch.username=${LOGSTASH_SYSTEM_USERNAME}
+      - xpack.monitoring.elasticsearch.password=${LOGSTASH_SYSTEM_PASSWORD}
+      - LS_JAVA_OPTS=${LS_JAVA_OPTS}
+      - ELASTICSEARCH_CERT=${ELASTICSEARCH_CRT}
+      - ELASTICSEARCH_SSL_VERIFICATIONMODE=${LOGSTASH_ELASTICSEARCH_SSL_VERIFICATIONMODE:-certificate}
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS}
+      - LOGSTASH_USERNAME=${LOGSTASH_USERNAME}
+      - LOGSTASH_PASSWORD=${LOGSTASH_PASSWORD}
+      - API_BUILDER_URL=${API_BUILDER_URL}
+      - API_BUILDER_SSL_CERT=${API_BUILDER_SSL_CERT}
+      - MEMCACHED=${MEMCACHED}
+      - DROP_TRACE_MESSAGE_LEVELS=${DROP_TRACE_MESSAGE_LEVELS}
+    ports:
+      - 5044:5044
+    volumes:
+      - ./logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml
+      - ./logstash/pipelines:/usr/share/logstash/pipelines
+      - ./logstash/index_templates:/usr/share/logstash/index_templates
+      - ./config/certificates:/usr/share/logstash/config/certificates
+      - ./logstash/scripts:/usr/share/logstash/scripts
+    #command: logstash --path.config /usr/share/logstash/pipelines/pipelines.yml
+    depends_on:
+      - apibuilder4elastic
+      - memcached
+    networks:
+      - elastic
+    logging:
+      options:
+        max-file: "3"
+        max-size: "10m"
+
+  # Memcached is used by the Logstash pipeline to cache API-Lookup information that are used to get the API-Organization
+  memcached:
+    image: memcached:1.6.6-alpine
+    container_name: memcached
+    ports:
+      - 11211:11211
+    networks:
+      - elastic
+    logging:
+      options:
+        max-file: "2"
+        max-size: "5m"
+
+  # This is the API-Builder project exposing the API-Gateway Manager REST-API
+  apibuilder4elastic:
+    image: cwiechmann/apibuilder4elastic:v4.2.0
+    restart: on-failure:10
+    container_name: apibuilder4elastic
+    # Enable this, if you want to debug a crashing container
+    # command: sleep 10000
+    environment:
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS}
+      - ADMIN_NODE_MANAGER=${ADMIN_NODE_MANAGER}
+      - API_MANAGER=${API_MANAGER}
+      - API_MANAGER_USERNAME=${API_MANAGER_USERNAME}
+      - API_MANAGER_PASSWORD=${API_MANAGER_PASSWORD}
+      - API_BUILDER_USERNAME=${API_BUILDER_USERNAME}
+      - API_BUILDER_PASSWORD=${API_BUILDER_PASSWORD}
+      - API_BUILDER_SSL_KEY=${API_BUILDER_SSL_KEY}
+      - API_BUILDER_SSL_CERT=${API_BUILDER_SSL_CERT}
+      - API_BUILDER_SSL_KEY_PASSWORD=${API_BUILDER_SSL_KEY_PASSWORD}
+      - ELASTICSEARCH_CA=${ELASTICSEARCH_CA}
+      - ELASTICSEARCH_SSL_VERIFICATIONMODE=${APIBUILDER_ELASTICSEARCH_SSL_VERIFICATIONMODE:-true}
+      - API_BUILDER_LOCAL_API_LOOKUP_FILE=${API_BUILDER_LOCAL_API_LOOKUP_FILE}
+      - AUTHZ_CONFIG=${AUTHZ_CONFIG}
+      - RETENTION_PERIOD_CONFIG=${RETENTION_PERIOD_CONFIG}
+      - ENABLE_HTTP_PORT=false
+      - PAYLOAD_HANDLING_ENABLED=${PAYLOAD_HANDLING_ENABLED}
+      - DISABLE_SETUP_FLOWS=${DISABLE_SETUP_FLOWS}
+      - DISABLE_CUSTOM_PROPERTIES=${DISABLE_CUSTOM_PROPERTIES}
+      - EXT_AUTHZ_URI=${EXT_AUTHZ_URI}
+      - MANAGEMENT_KPIS_ENABLED=${MANAGEMENT_KPIS_ENABLED}
+      - API_MANAGER_ENABLED=${API_MANAGER_ENABLED}
+      - LOG_LEVEL=${API_BUILDER_LOG_LEVEL}
+      - APM_ENABLED=${APM_ENABLED}
+      - APM_SERVER=${APM_SERVER}
+      - APM_SERVER_CA=${APM_SERVER_CA}
+    ports:
+      - 8443:8443
+    networks:
+      - elastic
+    volumes:
+      - ./config:/app/config
+      - ${APIGATEWAY_PAYLOADS_FOLDER}:/var/log/payloads
+    logging:
+      options:
+        max-file: "3"
+        max-size: "10m"
+
+volumes:
+  logs:
+
+networks:
+  elastic:

@@ -1,0 +1,812 @@
+{
+	"schemaVersion": "4",
+	"info": {
+		"name": "Payload API",
+		"description": "Triggered when payload is requested"
+	},
+	"parameter": {
+		"properties": {
+			"params": {
+				"type": "object",
+				"description": "The parameters from the endpoint."
+			},
+			"request": {
+				"type": "object",
+				"description": "The HTTP request."
+			},
+			"config": {
+				"type": "object",
+				"description": "The service's configuration"
+			},
+			"env": {
+				"type": "object",
+				"description": "The host OS environment"
+			}
+		},
+		"additionalProperties": false,
+		"required": [
+			"request",
+			"config",
+			"env",
+			"params"
+		]
+	},
+	"start": "condition.2",
+	"nodes": {
+		"file.1": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-file/file",
+			"name": "Read payload file",
+			"method": "readFile",
+			"parameters": [
+				{
+					"name": "data",
+					"type": "jsonpath",
+					"value": "$",
+					"metaName": "Data",
+					"metaDescription": "If you are using a dynamic filename that contains variables, you need to provide this data object, which is used to replace your variables. Example: ${conf.myFolder}/some/static/${filename}"
+				},
+				{
+					"name": "filename",
+					"type": "string",
+					"value": "\"${config.payload.folder}/${payloadFilename}\"",
+					"metaName": "Source filename",
+					"metaDescription": "The filename to read."
+				},
+				{
+					"name": "limit",
+					"type": "jsonpath",
+					"value": "$.payloadLimit",
+					"metaName": "Max read limit",
+					"metaDescription": "Read the file up to a certain limit given in Bytes."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"javascript.4"
+					],
+					"context": "$.payload",
+					"metaName": "Next"
+				},
+				"notFound": {
+					"routes": [],
+					"context": "$.result",
+					"metaName": "Not found"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Read file"
+		},
+		"elasticsearch.1": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-elasticsearch/elasticsearch",
+			"name": "Search details",
+			"method": "search",
+			"parameters": [
+				{
+					"name": "index",
+					"type": "jsonpath",
+					"value": "$.index",
+					"metaName": "Index",
+					"metaDescription": "Comma-separated list or wildcard expression of index names used to limit the request."
+				},
+				{
+					"name": "query",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.query",
+					"metaName": "Query",
+					"metaDescription": "Defines the search definition using the Query DSL. Learn more: https://www.elastic.co/guide/en/elasticsearch/reference/7.x/query-dsl.html"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": ["elk-solution-utils.1"],
+					"context": "$.transactionDetails"
+				},
+				"noResult": {
+					"routes": ["elk-solution-utils.1"],
+					"context": "$.transactionDetails"
+				},
+				"missingIndex": {
+					"routes": ["http.3"],
+					"context": "$.error"
+				},
+				"error": {
+					"routes": ["http.3"],
+					"context": "$.error"
+				}
+			},
+			"metaMethod": "Search"
+		},
+		"javascript.1": {
+			"type": "nodehandler://@axway/api-builder-plugin-fn-javascript/javascript",
+			"name": "Get Details Index",
+			"method": "Execute",
+			"parameters": [
+				{
+					"name": "data",
+					"type": "jsonpath",
+					"value": "$",
+					"metaName": "data",
+					"metaDescription": "The value to apply as the `data` argument to the JavaScript code. For objects and arrays, `data` is passed by reference."
+				},
+				{
+					"name": "code",
+					"type": "string",
+					"value": "\"// Perhaps there is a region given\\n  let region = data.params.region;\\n  \\n  let index = 'apigw-traffic-details';\\n  // Atach the region if given\\n  if(region) {\\n    index = `${index}-${region.toLowerCase()}`;\\n  }\\n  index = `${index}-*`;\\n  \\n  if(data.config.testElasticIndex) {\\n    index = data.config.testElasticIndex;\\n  }\\n  \\n  return index;\"",
+					"metaName": "code",
+					"metaDescription": "A JavaScript function body. Supports `await` and returning promises."
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.index",
+					"routes": [
+						"authorization.4"
+					],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Execute"
+		},
+		"http.2": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Set HTTP Response",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "200",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.fileContent",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				},
+				{
+					"name": "headers",
+					"type": "object",
+					"value": "{\n  \"Content-Type\": \"application/vordel-xact-data\"\n}",
+					"metaName": "Headers",
+					"metaDescription": "Key-value pairs of headers"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [
+						"javascript.3"
+					],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"elk-solution-utils.1": {
+			"type": "nodehandler://api-builder-plugin-elk-solution-utils/elk-solution-utils",
+			"name": "Get payload filename",
+			"method": "getPayloadFilename",
+			"parameters": [
+				{
+					"name": "correlationId",
+					"type": "jsonpath",
+					"value": "$.params.correlationID",
+					"metaName": "CorrelationId",
+					"metaDescription": "The correlation ID of the transaction."
+				},
+				{
+					"name": "direction",
+					"type": "jsonpath",
+					"value": "$.params.direction",
+					"metaName": "Direction",
+					"metaDescription": "The direction. Either sent or received"
+				},
+				{
+					"name": "trafficDetails",
+					"type": "jsonpath",
+					"value": "$.transactionDetails",
+					"metaName": "Traffic-Details",
+					"metaDescription": "Traffic details returned from Elasticsearch for the selected correlationID"
+				},
+				{
+					"name": "legNo",
+					"type": "jsonpath",
+					"value": "$.params.legID",
+					"metaName": "Leg-Number",
+					"metaDescription": "The Leg-Number"
+				},
+				{
+					"name": "region",
+					"type": "jsonpath",
+					"value": "$.params.region"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"file.1",
+						"condition.1"
+					],
+					"context": "$.payloadFilename",
+					"metaName": "Next"
+				},
+				"notFound": {
+					"routes": [
+						"javascript.4"
+					],
+					"context": "$.payload",
+					"metaName": "Not found"
+				},
+				"noAccess": {
+					"routes": [
+						"http.1"
+					],
+					"context": "$.noAccessMessage",
+					"metaName": "No access"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Get payload filename"
+		},
+		"condition.1": {
+			"type": "nodehandler://axway-flow/condition",
+			"name": "Is show request?",
+			"method": "equals",
+			"parameters": [
+				{
+					"name": "value",
+					"type": "string",
+					"value": "\"*/*\"",
+					"metaName": "Value",
+					"metaDescription": "The value to test input against."
+				},
+				{
+					"name": "source",
+					"type": "jsonpath",
+					"value": "$.request.headers.accept",
+					"metaName": "Source",
+					"metaDescription": "The input to test."
+				}
+			],
+			"outputs": {
+				"true": {
+					"routes": [
+						"setcontext.1"
+					],
+					"context": "$.equals",
+					"metaName": "True"
+				},
+				"false": {
+					"routes": [
+						"file.1"
+					],
+					"context": "$.equals",
+					"metaName": "False"
+				}
+			},
+			"metaMethod": "Equals"
+		},
+		"setcontext.1": {
+			"type": "nodehandler://axway-flow/setcontext",
+			"name": "Limit payload size",
+			"method": "setcontext",
+			"parameters": [
+				{
+					"name": "value",
+					"type": "jsonpath",
+					"value": "$.config.payload.sizeLimit",
+					"metaName": "Value"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.payloadLimit",
+					"routes": [
+						"file.1"
+					],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set Context"
+		},
+		"authorization.1": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "Switch on Authorization",
+			"method": "switchOnAuthZ",
+			"parameters": [],
+			"outputs": {
+				"org": {
+					"routes": [
+						"authorization.2"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Organization"
+				},
+				"extHttp": {
+					"routes": [
+						"authorization.3"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Ext-HTTP"
+				},
+				"skip": {
+					"routes": [
+						"elasticsearch.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Skip"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Switch on Authorization"
+		},
+		"axway-api-management.1": {
+			"type": "nodehandler://api-builder-plugin-axway-api-management/axway-api-management",
+			"name": "Lookup current user",
+			"method": "lookupCurrentUser",
+			"parameters": [
+				{
+					"name": "requestHeaders",
+					"type": "jsonpath",
+					"value": "$.request.headers",
+					"metaName": "Request Headers",
+					"metaDescription": "The request headers are used to lookup the current users based on the current session cookie (VIDUSR)."
+				},
+				{
+					"name": "getApiManagerUser",
+					"type": "jsonpath",
+					"value": "$.authzConfig.getApiManagerUser",
+					"metaName": "Get the API-Manager user?",
+					"metaDescription": "If set to false, the flow-node does not tries to lookup the user on the API-Manager. Set it to false, when for instance user authorization is disabled as there might be no belonging user configured in the API-Manager."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"axway-api-management.2"
+					],
+					"context": "$.user",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Lookup current user"
+		},
+		"authorization.2": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "API-Manager-Org Authorization",
+			"method": "addApiManagerOrganizationFilter",
+			"parameters": [
+				{
+					"name": "user",
+					"type": "jsonpath",
+					"value": "$.user",
+					"metaName": "API-Manager user",
+					"metaDescription": "User object looked up at the API-Manager"
+				},
+				{
+					"name": "elasticQuery",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.query",
+					"metaName": "Elasticsearch query",
+					"metaDescription": "The Elasticsearch query that should be enhanced with a filter."
+				},
+				{
+					"name": "indexProperty",
+					"type": "string",
+					"value": "\"transactionSummary.serviceContext.apiOrg\"",
+					"metaName": "Index property",
+					"metaDescription": "The name of the Elasticsearch property within the index to restrict the query on. If not given: serviceContext.apiOrg is used."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elasticsearch.1"
+					],
+					"context": "$.elasticsearch.query",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "API-Manager-Org Authorization"
+		},
+		"authorization.3": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "External HTTP-Based Authorization",
+			"method": "addExtHTTPAuthzFilter",
+			"parameters": [
+				{
+					"name": "elasticQuery",
+					"type": "jsonpath",
+					"value": "$.elasticsearch.query",
+					"metaName": "Elasticsearch query",
+					"metaDescription": "The Elasticsearch query that should be enhanced with a filter."
+				},
+				{
+					"name": "user",
+					"type": "jsonpath",
+					"value": "$.user",
+					"metaName": "API-Manager user",
+					"metaDescription": "User object that contains the loginName property"
+				},
+				{
+					"name": "restrictionField",
+					"type": "jsonpath",
+					"value": "$.authzConfig.detailedRestrictionField",
+					"metaName": "Restriction field",
+					"metaDescription": "The field on which the restriction should be applied. For instance a custom property."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elasticsearch.1"
+					],
+					"context": "$.elasticsearch.query",
+					"metaName": "Next"
+				},
+				"noAccess": {
+					"routes": [
+						"http.1"
+					],
+					"context": "$.noAccess",
+					"metaName": "No access"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "External HTTP-Based Authorization"
+		},
+		"http.1": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "No access",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "403",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"http.3": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Int. server error",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "500",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"javascript.3": {
+			"type": "nodehandler://@axway/api-builder-plugin-fn-javascript/javascript",
+			"name": "Add Filename header",
+			"method": "Execute",
+			"parameters": [
+				{
+					"name": "data",
+					"type": "jsonpath",
+					"value": "$",
+					"metaName": "data",
+					"metaDescription": "The value to apply as the `data` argument to the JavaScript code. For objects and arrays, `data` is passed by reference."
+				},
+				{
+					"name": "code",
+					"type": "string",
+					"value": "\"var params = data.params;\\n  console.log(`data.response.headers: ${data.response.headers}`);\\n  // Add a filename header in case the payload should be downloaded\\n  data.response.headers[\\\"Content-Disposition\\\"] = `attachment; filename=${params.correlationID}_${params.legID}_${params.direction}`;\"",
+					"metaName": "code",
+					"metaDescription": "A JavaScript function body. Supports `await` and returning promises."
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.result",
+					"routes": [],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Execute"
+		},
+		"condition.2": {
+			"type": "nodehandler://axway-flow/condition",
+			"name": "Payload handling enabled?",
+			"method": "equals",
+			"parameters": [
+				{
+					"name": "value",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Value",
+					"metaDescription": "The value to test input against."
+				},
+				{
+					"name": "source",
+					"type": "jsonpath",
+					"value": "$.config.payload.enabled",
+					"metaName": "Source",
+					"metaDescription": "The input to test."
+				}
+			],
+			"outputs": {
+				"true": {
+					"routes": [
+						"javascript.1"
+					],
+					"context": "$.equals",
+					"metaName": "True"
+				},
+				"false": {
+					"routes": [
+						"http.5"
+					],
+					"context": "$.equals",
+					"metaName": "False"
+				}
+			},
+			"metaMethod": "Equals"
+		},
+		"http.5": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Payload handling is disabled",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "501",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "object",
+					"value": "{\"message\":\"Payload handling is deactivated\"}",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"javascript.4": {
+			"type": "nodehandler://@axway/api-builder-plugin-fn-javascript/javascript",
+			"name": "Add Headers",
+			"method": "Execute",
+			"parameters": [
+				{
+					"name": "data",
+					"type": "jsonpath",
+					"value": "$",
+					"metaName": "data",
+					"metaDescription": "The value to apply as the `data` argument to the JavaScript code. For objects and arrays, `data` is passed by reference."
+				},
+				{
+					"name": "code",
+					"type": "string",
+					"value": "\"var source = data.transactionDetails.body.hits.hits[0]._source;\\n  var payload = data.payload;\\n  var direction = data.params.direction;\\n  var legID = data.params.legID;\\n  \\n  var headers;\\n  \\n  if(direction == \\\"sent\\\") {\\n    headers = source.transactionElements[`leg${legID}`].protocolInfo.sentHeader;\\n  } else if(direction == \\\"received\\\") {\\n    headers = source.transactionElements[`leg${legID}`].protocolInfo.recvHeader;\\n  }\\n  \\n  var result = `${headers}\\\\r\\\\n${payload}`;\\n  return result;\"",
+					"metaName": "code",
+					"metaDescription": "A JavaScript function body. Supports `await` and returning promises."
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.fileContent",
+					"routes": [
+						"http.2"
+					],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Execute"
+		},
+		"authorization.4": {
+			"type": "nodehandler://api-builder-plugin-authorization/authorization",
+			"name": "Get AuthZ config",
+			"method": "switchOnAuthZ",
+			"parameters": [],
+			"outputs": {
+				"skip": {
+					"routes": [
+						"axway-api-management.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Skip"
+				},
+				"org": {
+					"routes": [
+						"axway-api-management.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Organization"
+				},
+				"extHttp": {
+					"routes": [
+						"axway-api-management.1"
+					],
+					"context": "$.authzConfig",
+					"metaName": "Ext-HTTP"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Switch on Authorization"
+		},
+		"axway-api-management.2": {
+			"type": "nodehandler://api-builder-plugin-axway-api-management/axway-api-management",
+			"name": "Lookup topology",
+			"method": "lookupTopology",
+			"parameters": [
+				{
+					"name": "requestHeaders",
+					"type": "jsonpath",
+					"value": "$.request.headers",
+					"metaName": "Request Headers",
+					"metaDescription": "The request headers are used to lookup the topology using the currently logged in user."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"traffic-monitor-api-utils.1"
+					],
+					"context": "$.gatewayTopology",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Lookup topology"
+		},
+		"traffic-monitor-api-utils.1": {
+			"type": "nodehandler://api-builder-plugin-traffic-monitor-api-utils/traffic-monitor-api-utils",
+			"name": "Create Payload query",
+			"method": "createCircuitPathQuery",
+			"parameters": [
+				{
+					"name": "gatewayTopology",
+					"type": "jsonpath",
+					"value": "$.gatewayTopology",
+					"metaName": "API-Gateway Topology",
+					"metaDescription": "The API-Gateway topology as read by flow-node: axway-api-management->lookupTopology"
+				},
+				{
+					"name": "authzConfig",
+					"type": "jsonpath",
+					"value": "$.authzConfig",
+					"metaName": "Authorization configuration",
+					"metaDescription": "The authorization configuration object returned from Get AuthZ Config"
+				},
+				{
+					"name": "params",
+					"type": "jsonpath",
+					"value": "$.params",
+					"metaName": "Params",
+					"metaDescription": "The object must contain the given request parameters."
+				},
+				{
+					"name": "user",
+					"type": "jsonpath",
+					"value": "$.user",
+					"metaName": "User",
+					"metaDescription": "The user object using the API-Gateway Traffic-Monitor"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"authorization.1"
+					],
+					"context": "$.elasticsearch.query",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Create circuit path query"
+		}
+	}
+}

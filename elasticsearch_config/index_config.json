@@ -1,0 +1,105 @@
+{
+    "apigw-traffic-summary": {
+        "logType": "openlog",
+        "alias": "apigw-traffic-summary",
+        "template": {
+            "config": "elasticsearch_config/traffic-summary/index_template.json",
+            "name": "traffic-summary", 
+            "customProperties": {
+                "merge": true
+            }
+        }, 
+        "ilm" : {
+            "config": "elasticsearch_config/traffic-summary/ilm_policy.json",
+            "name": "apigw-traffic-summary-ilm"
+        }, 
+        "transform": {
+            "config": "elasticsearch_config/traffic-summary/transform_hourly.json",
+            "id": "apigw-traffic-summary-hourly",
+            "idSuffix": "v1"
+        }
+    }, 
+    "apigw-traffic-details": {
+        "logType": "openlog",
+        "alias": "apigw-traffic-details", 
+        "template": {
+            "config": "elasticsearch_config/traffic-details/index_template.json",
+            "name": "traffic-details", 
+            "customProperties": {
+                "merge": true,
+                "parent": "transactionSummary."
+            }
+        }, 
+        "ilm" : {
+            "config": "elasticsearch_config/traffic-details/ilm_policy.json",
+            "name": "apigw-traffic-details-ilm"
+        }
+    }, 
+    "apigw-traffic-trace": {
+        "logType": "trace",
+        "alias": "apigw-traffic-trace", 
+        "template": {
+            "config": "elasticsearch_config/trace-messages/index_template.json",
+            "name": "trace-messages", 
+            "customProperties": {
+                "merge": false
+            }
+        }, 
+        "ilm" : {
+            "config": "elasticsearch_config/trace-messages/ilm_policy.json",
+            "name": "apigw-traffic-trace-messages-ilm"
+        }
+    },
+    "apigw-trace-messages": {
+        "logType": "trace",
+        "alias": "apigw-trace-messages", 
+        "template": {
+            "config": "elasticsearch_config/trace-messages/index_template.json",
+            "name": "trace-messages", 
+            "customProperties": {
+                "merge": false
+            }
+        }, 
+        "ilm" : {
+            "config": "elasticsearch_config/trace-messages/ilm_policy.json",
+            "name": "apigw-trace-messages-ilm"
+        }
+    },
+    "apigw-domainaudit": {
+        "logType": "domainaudit",
+        "alias": "apigw-domainaudit",
+        "template": {
+            "config": "elasticsearch_config/apigw-domainaudit/index_template.json",
+            "name": "apigw-apigw-domainaudit", 
+            "customProperties": {
+                "merge": false
+            }
+        }, 
+        "ilm" : {
+            "config": "elasticsearch_config/apigw-domainaudit/ilm_policy.json",
+            "name": "apigw-domainaudit-ilm"
+        }
+    },
+    "apigw-monitoring": {
+        "logType": "events",
+        "alias": "apigw-monitoring", 
+        "template": {
+            "config": "elasticsearch_config/apigw-monitoring/index_template.json",
+            "name": "apigw-monitoring", 
+            "customProperties": {
+                "merge": false
+            }
+        }, 
+        "ilm" : {
+            "config": "elasticsearch_config/apigw-monitoring/ilm_policy.json",
+            "name": "apigw-monitoring-ilm"
+        }
+    },
+    "apigw-management-kpis": {
+        "alias": "apigw-management-kpis", 
+        "template": {
+            "config": "elasticsearch_config/management-kpis/index_template.json",
+            "name": "management-kpis"
+        }
+    }
+}

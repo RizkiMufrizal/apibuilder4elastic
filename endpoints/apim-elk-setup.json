@@ -1,0 +1,139 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Axway-APIM-ELK Setup-API",
+    "version": "1.0",
+    "description": "This API can optionally be called to call the setup of the Elasticsearch solution manually. The API calls a flow, which is also started automatically with a defined interval. The main purpose of the endpoint as of now is to test the flow implementation/logic.",
+    "contact": {
+      "name": "Chris Wiechmann",
+      "url": "https://www.axway.com",
+      "email": "cwiechmann@axway.com"
+    },
+    "license": {
+      "name": "Apache 2.0"
+    }
+  },
+  "host": "example.com",
+  "schemes": [
+    "https"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "paths": {
+    "/setup/index/{indexName}": {
+      "get": {
+        "summary": "Setup index",
+        "operationId": "run-setup",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Triggers the setup and update (Index-Template and ILM) for the given indexName.",
+        "parameters": [],
+        "tags": [
+          "setup"
+        ],
+        "x-flow": "SetupElasticsearchIndex"
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "name": "indexName",
+          "in": "path",
+          "required": true,
+          "description": "The name of the index to be configured in ES"
+        }
+      ]
+    },
+    "/setup/transform/{indexName}": {
+      "parameters": [
+        {
+          "type": "string",
+          "name": "indexName",
+          "in": "path",
+          "required": true,
+          "description": "The name of the index belonging transforms should be configured"
+        }
+      ],
+      "get": {
+        "summary": "Setup Transform",
+        "tags": [
+          "setup"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "operationId": "run-transform-setup",
+        "description": "Triggers the setup and update of the Transform in Elasticsearch, which normally runs every hour.",
+        "x-flow": "SetupElasticsearchTransform"
+      }
+    },
+    "/index/{logtype}": {
+      "parameters": [
+        {
+          "type": "string",
+          "name": "logtype",
+          "in": "path",
+          "required": true,
+          "description": "The log-type as it's given by Filebeat."
+        }
+      ],
+      "post": {
+        "summary": "",
+        "operationId": "Create index",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "description": "Creates all required indices for a given Log-Type and optionally the region. Based on the LogType the required indices are looked up in the index-config-file. If a region is given, the indices are created based on the region.",
+        "parameters": [
+          {
+            "type": "string",
+            "in": "query",
+            "name": "region",
+            "description": "If given, the index is created based on the given region. Region: N/A is considered as no region."
+          }
+        ],
+        "x-flow": "apim-elk-setup-Create indicies"
+      }
+    },
+    "/setup/index/rolloverAlias": {
+      "get": {
+        "summary": "Update Rollover Alias",
+        "tags": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "operationId": "update-rollover-alias",
+        "description": "Triggers the ILM Rollover-Alias update for all regional indicies manually.",
+        "x-flow": "apim-elk-setup-update-rollover-alias"
+      },
+      "parameters": []
+    }
+  },
+  "definitions": {},
+  "basePath": "/elk/v1/api",
+  "tags": [
+    {
+      "name": "setup"
+    }
+  ]
+}

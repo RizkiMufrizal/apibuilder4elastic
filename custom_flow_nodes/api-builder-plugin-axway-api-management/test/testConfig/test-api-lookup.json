@@ -1,0 +1,43 @@
+{
+    "/api/configured/locally": {
+        "organizationName": "General Org",
+        "name": "General API-Name",
+        "version": "1.0.1",
+        "deprecated": false,
+        "state": "published"
+    },
+    "/api/configured/locally/longest/match": {
+        "organizationName": "Longest match Org",
+        "name": "Locally configured API longest match",
+        "version": "1.0.0",
+        "deprecated": false,
+        "state": "published",
+        "apiSecurity": "API-Key",
+        "requestPolicy": "A custom policy",
+        "routingPolicy": "N/A", 
+        "responsePolicy": "N/A",
+        "faulthandlerPolicy": "N/A",
+        "backendBasePath": "http://i.can.give.any.host.i.want.com",
+        "customProperties": {
+            "customProperty1": "My custom property value"
+        }
+    },
+    "/minimal/config": {
+        "name": "The name is a MUST"
+    }, 
+    "/do/not/index/api": {
+        "ignore": true
+    },
+    "Policy: Do not index this policy": {
+        "ignore": true
+    },
+    "/NOT-YET-SUPPORTED/do/not/index/api|Policy: My policy ABC": {
+        "ignore": true
+    },
+    "/NOT-YET-SUPPORTED/do/not/index/POST/api/with/my/policy|Verb: POST|Policy: My policy ABC": {
+        "ignore": true
+    }, 
+    "/NOT-YET-SUPPORTED/do/not/index/options/api|Verb: OPTIONS": {
+        "ignore": true
+    }
+}

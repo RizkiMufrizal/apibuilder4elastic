@@ -1,0 +1,432 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Traffic Monitor API",
+    "version": "1.0",
+    "description": "This API is defining a subset of the Axway API-Gateway Admin-Node-Manager API ([Official Docs](http://apidocs.axway.com/swagger-ui/index.html?productname=apigateway&productversion=7.7.0&filename=api-gateway-swagger.json)) with the purpose to replace the implementation with an Elasticsearch datasource instead of the API-Gateway internal OPSDB.",
+    "license": {
+      "name": "Apache 2.0"
+    },
+    "contact": {
+      "name": "Chris Wiechmann",
+      "email": "cwiechmann@axway.com"
+    }
+  },
+  "host": "example.com",
+  "paths": {
+    "/router/service/{serviceID}/ops/search": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "format",
+            "type": "string"
+          },
+          {
+            "in": "query",
+            "name": "field",
+            "type": "string"
+          },
+          {
+            "in": "query",
+            "name": "value",
+            "type": "string"
+          },
+          {
+            "in": "query",
+            "name": "count",
+            "type": "string"
+          },
+          {
+            "in": "query",
+            "name": "ago",
+            "type": "string"
+          },
+          {
+            "in": "query",
+            "name": "protocol",
+            "type": "string"
+          },
+          {
+            "in": "query",
+            "name": "op",
+            "type": "string"
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "Authorization",
+            "description": "Alternatively to the VIDUSR cookie you can also provide an HTTP Basic Authoritation header for a valid ANM user. \nIf this user is NOT an API-Gateway Admin the user must exists on the API-Manager as well."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "Cookie",
+            "description": "If using the cookie, it must contain the VIDUSR cookie from the ANM."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "csrf-token",
+            "description": "This is required if the VIDUSR cookie from the ANM is used."
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "region",
+            "description": "If given, the search will be performed on regional index."
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "jmsPropertyName",
+            "description": "Name of a JMS-Request property"
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "jmsPropertyValue",
+            "description": "Value of a JMS-Request property"
+          }
+        ],
+        "summary": "Seach requests to build Traffic-Overview table",
+        "description": "This endpoint is used by the API-Gateway Traffic-Monitor to search for processed requests and create the Requests-Table.",
+        "operationId": "search",
+        "x-flow": "trafficMonitorApi-search"
+      },
+      "parameters": [
+        {
+          "name": "serviceID",
+          "in": "path",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    "/router/service/{serviceID}/ops/stream/{correlationID}/*/circuitpath": {
+      "get": {
+        "summary": "Retrieves circuitpath information",
+        "tags": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "operationId": "circuitpath",
+        "description": "Retrieves information about the executed policies and filters associated to a transaction identified by its correlationID and serviceID",
+        "x-flow": "trafficMonitorApi-circuitpath",
+        "parameters": [
+          {
+            "type": "string",
+            "in": "query",
+            "name": "region",
+            "description": "If given, the search will be performed on regional index."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "cookie",
+            "description": "If using the cookie, it must contain the VIDUSR cookie from the ANM."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "csrf-token",
+            "description": "This is required if the VIDUSR cookie from the ANM is used."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "Authorization",
+            "description": "Alternatively to the VIDUSR cookie you can also provide an HTTP Basic Authoritation header for a valid ANM user. If this user is NOT an API-Gateway Admin the user must exists on the API-Manager as well."
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "name": "serviceID",
+          "in": "path",
+          "required": true,
+          "description": "instance of the API Gateway e.g.instance-1"
+        },
+        {
+          "type": "string",
+          "name": "correlationID",
+          "in": "path",
+          "required": true,
+          "description": "Transaction ID"
+        }
+      ]
+    },
+    "/router/service/{serviceID}/ops/{protocol}/{correlationID}/{legID}/getinfo": {
+      "get": {
+        "summary": "Retrieves event information",
+        "tags": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "operationId": "getinfo",
+        "x-flow": "trafficMonitorApi-getinfo",
+        "parameters": [
+          {
+            "type": "string",
+            "in": "query",
+            "name": "format"
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "details"
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "rheaders"
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "sheaders"
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "region",
+            "description": "If given, the search will be performed on regional index."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "cookie",
+            "description": "If using the cookie, it must contain the VIDUSR cookie from the ANM."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "csrf-token",
+            "description": "This is required if the VIDUSR cookie from the ANM is used."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "Authorization",
+            "description": "Alternatively to the VIDUSR cookie you can also provide an HTTP Basic Authoritation header for a valid ANM user. If this user is NOT an API-Gateway Admin the user must exists on the API-Manager as well."
+          }
+        ],
+        "description": "Retrieves information about events associated with the specified correlationID and legID"
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "name": "serviceID",
+          "in": "path",
+          "required": true,
+          "description": "instance of the API Gateway e.g.instance-1"
+        },
+        {
+          "type": "string",
+          "name": "protocol",
+          "in": "path",
+          "required": true
+        },
+        {
+          "type": "string",
+          "name": "correlationID",
+          "in": "path",
+          "required": true
+        },
+        {
+          "type": "string",
+          "name": "legID",
+          "in": "path",
+          "required": true
+        }
+      ]
+    },
+    "/router/service/{serviceID}/ops/trace/{correlationID}": {
+      "parameters": [
+        {
+          "type": "string",
+          "name": "serviceID",
+          "in": "path",
+          "required": true,
+          "description": "instance of the API Gateway e.g.instance-1"
+        },
+        {
+          "type": "string",
+          "name": "correlationID",
+          "in": "path",
+          "required": true,
+          "description": "identifies the transaction"
+        }
+      ],
+      "get": {
+        "summary": "Retrieves trace information",
+        "tags": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "operationId": "trace",
+        "description": "Retrieves trace information associated to a transaction identified by its correlationID and serviceID",
+        "parameters": [
+          {
+            "type": "string",
+            "in": "query",
+            "name": "format",
+            "description": "describes the result format (only json is supported; if not applied it is defaulted to json anyway) "
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "sentData"
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "receivedData"
+          },
+          {
+            "type": "string",
+            "in": "query",
+            "name": "region",
+            "description": "If given, the search will be performed on regional index."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "cookie",
+            "description": "If using the cookie, it must contain the VIDUSR cookie from the ANM."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "csrf-token",
+            "description": "This is required if the VIDUSR cookie from the ANM is used."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "Authorization",
+            "description": "Alternatively to the VIDUSR cookie you can also provide an HTTP Basic Authoritation header for a valid ANM user. If this user is NOT an API-Gateway Admin the user must exists on the API-Manager as well."
+          }
+        ],
+        "x-flow": "trafficMonitorApi-trace"
+      }
+    },
+    "/router/service/{serviceID}/ops/stream/{correlationID}/{legID}/{direction}": {
+      "get": {
+        "summary": "Payload API",
+        "tags": [],
+        "x-flow": "trafficMonitorApi-payload",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "operationId": "payload",
+        "description": "Endpoint triggered to load the transaction payload",
+        "parameters": [
+          {
+            "type": "string",
+            "in": "query",
+            "description": "If given, the payload is taken from the region folder",
+            "name": "region"
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "cookie",
+            "description": "If using the cookie, it must contain the VIDUSR cookie from the ANM."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "csrf-token",
+            "description": "This is required if the VIDUSR cookie from the ANM is used."
+          },
+          {
+            "type": "string",
+            "in": "header",
+            "name": "Authorization",
+            "description": "Alternatively to the VIDUSR cookie you can also provide an HTTP Basic Authoritation header for a valid ANM user. If this user is NOT an API-Gateway Admin the user must exists on the API-Manager as well."
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "name": "serviceID",
+          "in": "path",
+          "required": true,
+          "description": "instance of the API Gateway e.g.instance-1"
+        },
+        {
+          "type": "string",
+          "name": "correlationID",
+          "in": "path",
+          "required": true,
+          "description": "Transaction ID"
+        },
+        {
+          "type": "string",
+          "name": "legID",
+          "in": "path",
+          "required": true,
+          "description": "Leg number"
+        },
+        {
+          "type": "string",
+          "name": "direction",
+          "in": "path",
+          "required": true,
+          "description": "sent or received"
+        }
+      ]
+    }
+  },
+  "basePath": "/elk/v1/api"
+}

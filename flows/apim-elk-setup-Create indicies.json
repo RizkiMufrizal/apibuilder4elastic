@@ -1,0 +1,288 @@
+{
+	"schemaVersion": "4",
+	"info": {
+		"name": "Create index",
+		"description": "Creates the initial index."
+	},
+	"parameter": {
+		"properties": {
+			"params": {
+				"type": "object",
+				"description": "The parameters from the endpoint."
+			},
+			"request": {
+				"type": "object",
+				"description": "The HTTP request."
+			},
+			"config": {
+				"type": "object",
+				"description": "The service's configuration"
+			},
+			"env": {
+				"type": "object",
+				"description": "The host OS environment"
+			}
+		},
+		"additionalProperties": false,
+		"required": [
+			"request",
+			"config",
+			"env",
+			"params"
+		]
+	},
+	"start": "condition.1",
+	"nodes": {
+		"file.1": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-file/file",
+			"name": "Read Index-Config",
+			"method": "readFile",
+			"parameters": [
+				{
+					"name": "filename",
+					"type": "jsonpath",
+					"value": "$.config.indexConfigFile",
+					"metaName": "Source filename",
+					"metaDescription": "The filename to read."
+				},
+				{
+					"name": "notFoundFails",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Not found fails",
+					"metaDescription": "Set this flag, if you would like to have this flow node failed (Error) if the file cannot be found."
+				},
+				{
+					"name": "parseJson",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Parse JSON",
+					"metaDescription": "Turn this option if you are reading s JSON-File and would like to parse it into a JS-Object."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elk-solution-utils.2"
+					],
+					"context": "$.configFile",
+					"metaName": "Next"
+				},
+				"notFound": {
+					"routes": [],
+					"context": "$.result",
+					"metaName": "Not found"
+				},
+				"error": {
+					"routes": [
+						"http.4"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Read file"
+		},
+		"http.3": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Index created",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "201",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "object",
+					"value": "{\n  \"status\":\"ok\"\n}",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"elk-solution-utils.2": {
+			"type": "nodehandler://api-builder-plugin-elk-solution-utils/elk-solution-utils",
+			"name": "Get indices for Logtype",
+			"method": "getIndicesForLogtype",
+			"parameters": [
+				{
+					"name": "logtype",
+					"type": "jsonpath",
+					"value": "$.params.logtype",
+					"metaName": "Log-Type",
+					"metaDescription": "The LogType given by Filebeat."
+				},
+				{
+					"name": "indexConfigs",
+					"type": "jsonpath",
+					"value": "$.configFile",
+					"metaName": "Index configs",
+					"metaDescription": "Object that contains all index configurations"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elk-solution-utils.3"
+					],
+					"context": "$.indices",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.4"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Get indices for Logtype"
+		},
+		"elk-solution-utils.3": {
+			"type": "nodehandler://api-builder-plugin-elk-solution-utils/elk-solution-utils",
+			"name": "Create indices",
+			"method": "createIndices",
+			"parameters": [
+				{
+					"name": "indices",
+					"type": "jsonpath",
+					"value": "$.indices",
+					"metaName": "Indices",
+					"metaDescription": "Array of indexConfiguration objects"
+				},
+				{
+					"name": "region",
+					"type": "jsonpath",
+					"value": "$.params.region",
+					"metaName": "Region",
+					"metaDescription": "Region the index should be created for"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.indexConfig",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.4"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Create indices"
+		},
+		"http.4": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Set HTTP Response",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "500",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"condition.1": {
+			"type": "nodehandler://axway-flow/condition",
+			"name": "Is mocked?",
+			"method": "equals",
+			"parameters": [
+				{
+					"name": "source",
+					"type": "jsonpath",
+					"value": "$.config.mockIndexCreation",
+					"metaName": "Source",
+					"metaDescription": "The input to test."
+				},
+				{
+					"name": "value",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Value",
+					"metaDescription": "The value to test input against."
+				}
+			],
+			"outputs": {
+				"true": {
+					"routes": [
+						"http.1"
+					],
+					"context": "$.equals",
+					"metaName": "True"
+				},
+				"false": {
+					"routes": [
+						"file.1"
+					],
+					"context": "$.equals",
+					"metaName": "False"
+				}
+			},
+			"metaMethod": "Equals"
+		},
+		"http.1": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Return mocked response",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "201",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "object",
+					"value": "{\n  \"mocked\":\"index-created\"\n}",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		}
+	}
+}

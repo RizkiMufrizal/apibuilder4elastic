@@ -1,0 +1,972 @@
+{
+	"schemaVersion": "4",
+	"info": {
+		"name": "Setup Elasticsearch Index",
+		"description": "Flow configures Elasticsearch Index (Mappings, ILM and Rollup)",
+		"author": "support@axway.com",
+		"license": "ISC"
+	},
+	"parameter": {
+		"properties": {
+			"config": {
+				"type": "object",
+				"description": "The service's configuration."
+			},
+			"env": {
+				"type": "object",
+				"description": "The host OS environment."
+			},
+			"indexName": {
+				"type": "string",
+				"description": "The name of the index used as a prefix to name required ES config assets."
+			},
+			"params": {
+				"type": "object",
+				"description": "The parameters from the endpoint."
+			},
+			"request": {
+				"type": "object",
+				"description": "The HTTP request."
+			}
+		},
+		"additionalProperties": false
+	},
+	"start": "condition.1",
+	"nodes": {
+		"axway-api-management.1": {
+			"type": "nodehandler://api-builder-plugin-axway-api-management/axway-api-management",
+			"name": "Get custom properties",
+			"method": "getCustomPropertiesConfig",
+			"parameters": [
+				{
+					"name": "disableCustomProperties",
+					"type": "jsonpath",
+					"value": "$.config.disableCustomProperties",
+					"metaName": "Disable custom properties",
+					"metaDescription": "Convience flag to disable loading of custom properties. This may be set by a configuration toggle."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"file.1"
+					],
+					"context": "$.customProperties",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"http.2"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Get custom properties"
+		},
+		"elasticsearch.1": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-elasticsearch/elasticsearch",
+			"name": "Get index template",
+			"method": "getTemplate",
+			"parameters": [
+				{
+					"name": "name",
+					"type": "jsonpath",
+					"value": "$.indexConfig.template.name",
+					"metaName": "Index template name",
+					"metaDescription": "Name of the legacy index template."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"axway-api-management.2"
+					],
+					"context": "$.actualIndexTemplate",
+					"metaName": "Next"
+				},
+				"notFound": {
+					"routes": [
+						"axway-api-management.2"
+					],
+					"context": "$.actualIndexTemplate",
+					"metaName": "Not found"
+				},
+				"error": {
+					"routes": [
+						"http.2"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Get Index Template"
+		},
+		"axway-api-management.2": {
+			"type": "nodehandler://api-builder-plugin-axway-api-management/axway-api-management",
+			"name": "Merge custom properties",
+			"method": "mergeCustomProperties",
+			"parameters": [
+				{
+					"name": "customProperties",
+					"type": "jsonpath",
+					"value": "$.customProperties",
+					"metaName": "Custom properties",
+					"metaDescription": "The custom properties as they have been loaded from the API-Manager"
+				},
+				{
+					"name": "desiredIndexTemplate",
+					"type": "jsonpath",
+					"value": "$.desiredIndexTemplate",
+					"metaName": "Desired Index template",
+					"metaDescription": "The desired Elasticsearch index template containing the mappings."
+				},
+				{
+					"name": "actualIndexTemplate",
+					"type": "jsonpath",
+					"value": "$.actualIndexTemplate",
+					"metaName": "Actual Index template",
+					"metaDescription": "The actual Index-Template mapping loaded from Elasticsearch used to compare if new custom properties have been added. If all custom properties are already part of the mapping, the noUpdate exit is used."
+				},
+				{
+					"name": "customPropertiesSettings",
+					"type": "jsonpath",
+					"value": "$.indexConfig.template.customProperties",
+					"metaName": "Custom properties settings",
+					"metaDescription": "Controls if and how custom properties should be merged into the index template. See config file: elasticsearch_config/index_config.json"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"setcontext.1"
+					],
+					"context": "$.desiredIndexTemplateBody",
+					"metaName": "Next"
+				},
+				"noUpdate": {
+					"routes": [
+						"elasticsearch.2"
+					],
+					"context": "$.desiredIndexTemplateBody",
+					"metaName": "No update"
+				},
+				"error": {
+					"routes": [
+						"http.2"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Merge custom properties"
+		},
+		"elasticsearch.2": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-elasticsearch/elasticsearch",
+			"name": "Update index template",
+			"method": "putTemplate",
+			"parameters": [
+				{
+					"name": "updateWhenChanged",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Update when changed",
+					"metaDescription": "If true, the flow-node load the existing template and if present, the version is compared. Only if the version of the given template is higher, the existing template will be updated. If there is no existing template a new template is created."
+				},
+				{
+					"name": "recreate",
+					"type": "jsonpath",
+					"value": "$.updateIndexTemplate",
+					"metaName": "Recreate index template",
+					"metaDescription": "If true, the index template is always updated."
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.desiredIndexTemplateBody",
+					"metaName": "Template",
+					"metaDescription": "The template definition."
+				},
+				{
+					"name": "name",
+					"type": "jsonpath",
+					"value": "$.indexConfig.template.name",
+					"metaName": "Index template name",
+					"metaDescription": "Name of the legacy index template."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elasticsearch.3"
+					],
+					"context": "$.indexTemplate",
+					"metaName": "Next"
+				},
+				"noUpdate": {
+					"routes": [],
+					"context": "$.message",
+					"metaName": "No update"
+				},
+				"error": {
+					"routes": [
+						"http.2"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Put Index Template"
+		},
+		"file.1": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-file/file",
+			"name": "Read index template",
+			"method": "readFile",
+			"parameters": [
+				{
+					"name": "parseJson",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Parse JSON",
+					"metaDescription": "Turn this option if you are reading s JSON-File and would like to parse it into a JS-Object."
+				},
+				{
+					"name": "filename",
+					"type": "jsonpath",
+					"value": "$.indexConfig.template.config",
+					"metaName": "Source filename",
+					"metaDescription": "The filename to read."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elasticsearch.1"
+					],
+					"context": "$.desiredIndexTemplate",
+					"metaName": "Next"
+				},
+				"notFound": {
+					"routes": [],
+					"context": "$.result",
+					"metaName": "Not found"
+				},
+				"error": {
+					"routes": [
+						"http.2"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Read file"
+		},
+		"file.2": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-file/file",
+			"name": "Read ILM Config",
+			"method": "readFile",
+			"parameters": [
+				{
+					"name": "parseJson",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Parse JSON",
+					"metaDescription": "Turn this option if you are reading s JSON-File and would like to parse it into a JS-Object."
+				},
+				{
+					"name": "filename",
+					"type": "jsonpath",
+					"value": "$.indexConfig.ilm.config",
+					"metaName": "Source filename",
+					"metaDescription": "The filename to read."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elk-solution-utils.2"
+					],
+					"context": "$.ilmPolicyBody",
+					"metaName": "Next"
+				},
+				"notFound": {
+					"routes": [],
+					"context": "$.result",
+					"metaName": "Not found"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Read file"
+		},
+		"elasticsearch.6": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-elasticsearch/elasticsearch",
+			"name": "Put ILM policy",
+			"method": "putILMPolicy",
+			"parameters": [
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.ilmPolicyBody",
+					"metaName": "Policy-Body",
+					"metaDescription": "The lifecycle policy definition to register"
+				},
+				{
+					"name": "updateWhenChanged",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Update when changed",
+					"metaDescription": "If set, the specified ILM policy and the ILM policy in Elasticsearch are compared and only updated if they are different. Note, that the ILM-Policy returned from Elasticsearch may contain default values. These defaults must be part of you desired ILM Policy. If the ILM policy does not exist in Elasticsearch, the ILM policy is created."
+				},
+				{
+					"name": "policy",
+					"type": "jsonpath",
+					"value": "$.indexConfig.ilm.name",
+					"metaName": "Policy-Name",
+					"metaDescription": "The name of the index lifecycle policy"
+				},
+				{
+					"name": "attachToIndexTemplate",
+					"type": "jsonpath",
+					"value": "$.templateNameWithAlias",
+					"metaName": "Attach Policy to template",
+					"metaDescription": "If specified, the created/updated ILM policy is assigned to one more index templates. Index template names specified as a comma-separated list, each may contain an rollover alias. E.g. template1:aliasName1, template2"
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [],
+					"context": "$.ilmPolicy",
+					"metaName": "Next"
+				},
+				"noUpdate": {
+					"routes": [],
+					"context": "$.message",
+					"metaName": "No update"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Put ILM policy"
+		},
+		"setcontext.1": {
+			"type": "nodehandler://axway-flow/setcontext",
+			"name": "Set update required",
+			"method": "setcontext",
+			"parameters": [
+				{
+					"name": "value",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Value"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.updateIndexTemplate",
+					"routes": [
+						"elasticsearch.2"
+					],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set Context"
+		},
+		"file.4": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-file/file",
+			"name": "Read Index-Config",
+			"method": "readFile",
+			"parameters": [
+				{
+					"name": "parseJson",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Parse JSON",
+					"metaDescription": "Turn this option if you are reading s JSON-File and would like to parse it into a JS-Object."
+				},
+				{
+					"name": "notFoundFails",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Not found fails",
+					"metaDescription": "Set this flag, if you would like to have this flow node failed (Error) if the file cannot be found."
+				},
+				{
+					"name": "filename",
+					"type": "jsonpath",
+					"value": "$.config.indexConfigFile",
+					"metaName": "Source filename",
+					"metaDescription": "The filename to read."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elk-solution-utils.1"
+					],
+					"context": "$.configFile",
+					"metaName": "Next"
+				},
+				"notFound": {
+					"routes": [],
+					"context": "$.result",
+					"metaName": "Not found"
+				},
+				"error": {
+					"routes": [
+						"http.5"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Read file"
+		},
+		"delay.1": {
+			"type": "nodehandler://axway-flow/delay",
+			"name": "Wait for template",
+			"method": "delay",
+			"parameters": [
+				{
+					"name": "delay",
+					"type": "number",
+					"value": "2000",
+					"metaName": "Delay",
+					"metaDescription": "The length of delay, in milliseconds."
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.delayed",
+					"routes": [
+						"condition.2"
+					],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Delay"
+		},
+		"elasticsearch.3": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-elasticsearch/elasticsearch",
+			"name": "Rollover index",
+			"method": "indicesRollover",
+			"parameters": [
+				{
+					"name": "alias",
+					"type": "jsonpath",
+					"value": "$.indexConfig.alias",
+					"metaName": "Alias",
+					"metaDescription": "Name of the existing index alias or data stream on which to the perform the rollover. Can be a string or an object. (e.g. { \"my-rollover-alias\": {} }). Only one alias is supported."
+				},
+				{
+					"name": "wildcardAlias",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Wildcard alias",
+					"metaDescription": "Given alias is considered as a prefix. All indicies starting with the alias, will be rolled up."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [],
+					"context": "$.result",
+					"metaName": "Next"
+				},
+				"error": {
+					"routes": [
+						"javascript.1"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Rollover index"
+		},
+		"mustache.1": {
+			"type": "nodehandler://@axway/api-builder-plugin-fn-mustache/mustache",
+			"name": "Rollover-Alias",
+			"method": "format",
+			"parameters": [
+				{
+					"name": "data",
+					"type": "jsonpath",
+					"value": "$",
+					"metaName": "Data",
+					"metaDescription": "The value to assign to the \"data\" variable in the template."
+				},
+				{
+					"name": "template",
+					"type": "string",
+					"value": "\"{{data.indexConfig.template.name}}:{{data.indexConfig.alias}}\"",
+					"metaName": "Template",
+					"metaDescription": "The Mustache template. e.g. `Hi {{data.user}}`."
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.templateNameWithAlias",
+					"routes": [
+						"elasticsearch.6"
+					],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [
+						"http.3"
+					],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Format string"
+		},
+		"elk-solution-utils.1": {
+			"type": "nodehandler://api-builder-plugin-elk-solution-utils/elk-solution-utils",
+			"name": "Get index config",
+			"method": "getIndexConfig",
+			"parameters": [
+				{
+					"name": "data",
+					"type": "jsonpath",
+					"value": "$",
+					"metaName": "Data",
+					"metaDescription": "Object that contains either the property indexName or params.indexName."
+				},
+				{
+					"name": "indexConfigs",
+					"type": "jsonpath",
+					"value": "$.configFile",
+					"metaName": "Index configs",
+					"metaDescription": "Object that contains all index configurations"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.indexConfig",
+					"routes": [
+						"axway-api-management.1",
+						"delay.1"
+					],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [
+						"http.5"
+					],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Get index config"
+		},
+		"http.2": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Set Error-Response",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "400",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [
+						"power.1"
+					],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"http.3": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Set Error-Response",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "400",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [
+						"power.2"
+					],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"http.5": {
+			"type": "nodehandler://axway-flow/http",
+			"name": "Set Error-Response",
+			"method": "setresponse",
+			"parameters": [
+				{
+					"name": "status",
+					"type": "number",
+					"value": "400",
+					"metaName": "Status",
+					"metaDescription": "The HTTP status code"
+				},
+				{
+					"name": "body",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Body",
+					"metaDescription": "The response payload"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.response",
+					"routes": [],
+					"metaName": "Next"
+				}
+			},
+			"metaMethod": "Set HTTP Response"
+		},
+		"condition.1": {
+			"type": "nodehandler://axway-flow/condition",
+			"name": "Is disabled?",
+			"method": "equals",
+			"parameters": [
+				{
+					"name": "value",
+					"type": "string",
+					"value": "\"true\"",
+					"metaName": "Value",
+					"metaDescription": "The value to test input against."
+				},
+				{
+					"name": "source",
+					"type": "jsonpath",
+					"value": "$.env.DISABLE_SETUP_FLOWS",
+					"metaName": "Source",
+					"metaDescription": "The input to test."
+				}
+			],
+			"outputs": {
+				"true": {
+					"routes": [],
+					"context": "$.equals",
+					"metaName": "True"
+				},
+				"false": {
+					"routes": [
+						"file.4"
+					],
+					"context": "$.equals",
+					"metaName": "False"
+				}
+			},
+			"metaMethod": "Equals"
+		},
+		"javascript.1": {
+			"type": "nodehandler://@axway/api-builder-plugin-fn-javascript/javascript",
+			"name": "Handle Index not found error",
+			"method": "Execute",
+			"parameters": [
+				{
+					"name": "data",
+					"type": "jsonpath",
+					"value": "$",
+					"metaName": "Data",
+					"metaDescription": "The value to apply as the `data` argument of the JavaScript code. For objects and arrays, `data` is passed by reference."
+				},
+				{
+					"name": "code",
+					"type": "string",
+					"value": "\"if(!data.error.message.startsWith(\\\"No index found to rollover for alias:\\\")) {\\n    throw new Error(data.error);\\n  } else {\\n    return;\\n  }\"",
+					"metaName": "Code",
+					"metaDescription": "A JavaScript function body. Supports `await` and returning promises. `data` is the value of the Data parameter. `logger` is the API Builder logger. See the docs for more info: https://docs.axway.com/bundle/api-builder/page/docs/developer_guide/flows/flow_nodes/javascript_flow_node/index.html"
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.result",
+					"routes": [],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [
+						"http.2"
+					],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Execute"
+		},
+		"power.1": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-power/power",
+			"name": "Shutdown",
+			"method": "shutdown",
+			"parameters": [
+				{
+					"name": "skipInDevelopment",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Skip in development",
+					"metaDescription": "If set to true, the API-Builder process will not be stopped, when in development mode. Instead only the errorCode and errorMessage is logged."
+				},
+				{
+					"name": "errorMessage",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Error message",
+					"metaDescription": "An optional message which is logged when the process is terminated. Helpful to make clear the reason for the shutdown."
+				},
+				{
+					"name": "errorCode",
+					"type": "number",
+					"value": "99",
+					"metaName": "Error code",
+					"metaDescription": "An integer number used for the process to exit. Defaults to -1."
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.errorMessage",
+					"routes": [],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Shutdown"
+		},
+		"power.2": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-power/power",
+			"name": "Shutdown",
+			"method": "shutdown",
+			"parameters": [
+				{
+					"name": "errorCode",
+					"type": "number",
+					"value": "98",
+					"metaName": "Error code",
+					"metaDescription": "An integer number used for the process to exit. Defaults to -1."
+				},
+				{
+					"name": "errorMessage",
+					"type": "jsonpath",
+					"value": "$.error",
+					"metaName": "Error message",
+					"metaDescription": "An optional message which is logged when the process is terminated. Helpful to make clear the reason for the shutdown."
+				},
+				{
+					"name": "skipInDevelopment",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Skip in development",
+					"metaDescription": "If set to true, the API-Builder process will not be stopped, when in development mode. Instead only the errorCode and errorMessage is logged."
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": "$.errorMessage",
+					"routes": [],
+					"metaName": "Next"
+				},
+				"error": {
+					"context": "$.error",
+					"routes": [],
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Shutdown"
+		},
+		"elk-solution-utils.2": {
+			"type": "nodehandler://api-builder-plugin-elk-solution-utils/elk-solution-utils",
+			"name": "Setup ILM Retention-Period",
+			"method": "setupILMRententionPeriod",
+			"parameters": [
+				{
+					"name": "ilmConfig",
+					"type": "jsonpath",
+					"value": "$.ilmPolicyBody",
+					"metaName": "ILM-Config",
+					"metaDescription": "The ILM Config object that is supposed to be send to Elasticsearch to create or update the ILM-Policy. It is read from the $.indexConfig.ilm.config file and converted into an object."
+				},
+				{
+					"name": "indexConfig",
+					"type": "jsonpath",
+					"value": "$.indexConfig",
+					"metaName": "Index config",
+					"metaDescription": "Index configuration as defined in elasticsearch_config/index_config.json. It also contains the index name."
+				},
+				{
+					"name": "rententionPeriodConfig",
+					"type": "jsonpath",
+					"value": "$.retentionPeriodConfig",
+					"metaName": "Rentention period config",
+					"metaDescription": "Contains the path of the retention period config file. If not given, the standard ILM is used."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"mustache.1"
+					],
+					"context": "$.ilmPolicyBody",
+					"metaName": "Next"
+				},
+				"notChanged": {
+					"routes": [
+						"mustache.1"
+					],
+					"context": "$.ilmPolicyBody",
+					"metaName": "Not changed"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Setup ILM Rentention-Period"
+		},
+		"file.3": {
+			"type": "nodehandler://@axway-api-builder-ext/api-builder-plugin-fn-file/file",
+			"name": "Read retention period config",
+			"method": "readFile",
+			"parameters": [
+				{
+					"name": "filename",
+					"type": "jsonpath",
+					"value": "$.config.retentionPeriodConfigFile",
+					"metaName": "Source filename",
+					"metaDescription": "The filename to read."
+				},
+				{
+					"name": "parseJson",
+					"type": "boolean",
+					"value": "true",
+					"metaName": "Parse JSON",
+					"metaDescription": "Turn this option if you are reading s JSON-File and would like to parse it into a JS-Object."
+				}
+			],
+			"outputs": {
+				"next": {
+					"routes": [
+						"elk-solution-utils.2"
+					],
+					"context": "$.retentionPeriodConfig",
+					"metaName": "Next"
+				},
+				"notFound": {
+					"routes": [],
+					"context": "$.result",
+					"metaName": "Not found"
+				},
+				"error": {
+					"routes": [
+						"http.3"
+					],
+					"context": "$.error",
+					"metaName": "Error"
+				}
+			},
+			"metaMethod": "Read file"
+		},
+		"condition.2": {
+			"type": "nodehandler://axway-flow/condition",
+			"name": "ILM-Config NotSet?",
+			"method": "equals",
+			"parameters": [
+				{
+					"name": "source",
+					"type": "jsonpath",
+					"value": "$.indexConfig.ilm.config"
+				},
+				{
+					"name": "value",
+					"type": "string",
+					"value": "\"NotSet\""
+				}
+			],
+			"outputs": {
+				"true": {
+					"routes": [
+						"logger.1"
+					],
+					"context": "$.equals"
+				},
+				"false": {
+					"routes": [
+						"file.3",
+						"file.2"
+					],
+					"context": "$.equals"
+				}
+			}
+		},
+		"logger.1": {
+			"type": "nodehandler://@axway/api-builder-plugin-fn-logger/logger",
+			"name": "Log Message",
+			"method": "log",
+			"parameters": [
+				{
+					"name": "level",
+					"type": "string",
+					"value": "\"debug\""
+				},
+				{
+					"name": "message",
+					"type": "string",
+					"value": "\"Index has no ILM-Config defined.\""
+				}
+			],
+			"outputs": {
+				"next": {
+					"context": null,
+					"routes": []
+				},
+				"error": {
+					"context": "$.error",
+					"routes": []
+				}
+			}
+		}
+	}
+}

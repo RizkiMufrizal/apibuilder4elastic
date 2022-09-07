@@ -1,0 +1,160 @@
+flow-nodes:
+  traffic-monitor-api-utils:
+    name: Traffic-Monitor Utils
+    icon: icon.svg
+    description: Utility flow node that supports the implementation of the Traffic-Monitor API. For instance creating the required search queries for Elasticsearch.
+    category: general
+    methods:
+      handleFilterFields:
+        name: Handle filter fields
+        description: |
+          Parses the given filter fields in the request (e.g. http.uri) and creates the required Elasticsearch query. 
+          Based on the given Service-ID it is determined if additional Services should be included, which is required in EMT-Mode where also 
+          inactive Service-IDs should be part of the result-set.
+        parameters:
+          params:
+            name: Params
+            description: The object must contain the given request parameters.
+            required: true
+            schema:
+              type: object
+          serviceID:
+            name: ServiceId
+            description: The serviceId which is part of the request and given as a path parameter (r/service/instance-2/ops/)
+            required: true
+            schema:
+              type: string
+          gatewayTopology:
+            name: API-Gateway Topology
+            description: "The API-Gateway topology as read by flow-node: axway-api-management->lookupTopology"
+            required: true
+            schema:
+              type: object
+          region:
+            name: API-Gateway region
+            description: "If given this region is used to limit the query based on the field: processInfo.gatewayRegion"
+            required: false
+            schema:
+              type: object
+        returns:
+          name: Next
+          description: Returns the created search query for elastic search
+          context: $.query
+          schema:
+            type: object
+        throws:
+          name: Error
+          description: An unexpected error was encountered.
+          context: $.error
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+
+      getTransactionElementLegInfo:
+        name: Get Leg info
+        description: This flow node extracts the request and response information from the transaction elements (legs) so that they can be displayed in the traffic monitor.
+        parameters:
+          transactionElements:
+            name: TransactionElements
+            description: "The transaction element object returned by Elasticsearch traffic details index containing the individual Legs. The legs can contain HTTP or other protocols like JMS."
+            required: true
+            schema:
+              type: object
+          correlationId:
+            name: CorrelationId
+            description: "The correlation ID of the request. It needs to be added to the transaction information"
+            required: true
+            schema:
+              type: string
+          timestamp:
+            name: Request timestamp
+            description: "The timestamp of the request. It needs to be added to the transaction information"
+            required: true
+            schema:
+              type: string
+          legIdParam:
+            name: Leg-ID
+            description: "The number of the leg to be returned or * for all legs."
+            required: true
+            schema:
+              type: string
+          detailsParam:
+            name: Include details
+            description: "Should details returned or not (1 or 0)"
+            required: true
+            schema:
+              type: integer
+          sheadersParam:
+            name: Include Sent-Headers
+            description: "Should Sent-Headers returned or not (1 or 0)"
+            required: true
+            schema:
+              type: integer
+          rheadersParam:
+            name: Include Received-Headers
+            description: "Should Received-Headers returned or not (1 or 0)"
+            required: true
+            schema:
+              type: integer
+              
+        outputs:
+          next:
+            name: Next
+            description: The Leg-Information formatted as required by the Traffic-Monitor
+            context: $.result
+            schema:
+              oneOf:
+                - type: array
+                - type: object
+          error:
+            name: Error
+            description: An unexpected error happened
+            context: $.error
+            schema:
+              type: object
+
+      createCircuitPathQuery:
+        name: Create circuit path query
+        description: Creates the Elasticsearch query for circuit path requests.
+        parameters:
+          params:
+            name: Params
+            description: The object must contain the given request parameters.
+            required: true
+            schema:
+              type: object
+          user:
+            name: User
+            description: The user object using the API-Gateway Traffic-Monitor
+            required: true
+            schema:
+              type: object
+          authzConfig:
+            name: Authorization configuration
+            description: The authorization configuration object returned from Get AuthZ Config
+            required: true
+            schema:
+              type: object
+          gatewayTopology:
+            name: API-Gateway Topology
+            description: "The API-Gateway topology as read by flow-node: axway-api-management->lookupTopology"
+            required: true
+            schema:
+              type: object
+        returns:
+          name: Next
+          description: Returns the created search query for the circuit path
+          context: $.elasticsearch.query
+          schema:
+            type: object
+        throws:
+          name: Error
+          description: An unexpected error was encountered.
+          context: $.error
+          schema:
+            type: object
+            properties:
+              message:
+                type: string

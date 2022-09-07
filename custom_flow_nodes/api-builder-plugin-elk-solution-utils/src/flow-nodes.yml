@@ -1,0 +1,252 @@
+flow-nodes:
+  elk-solution-utils:
+    name: APIM-ELK Solution utils
+    icon: icon.svg
+    description: Helper flow node for APIM-ELK solution
+    category: general
+    methods:
+      getIndexConfig:
+        name: Get index config
+        description: Gets the index configuration
+        parameters:
+          data:
+            name: Data
+            description: Object that contains either the property indexName or params.indexName.
+            required: true
+            schema:
+              type: string
+          indexConfigs:
+            name: Index configs
+            description: Object that contains all index configurations
+            required: true
+            schema:
+              type: object
+        returns:
+          name: Next
+          description: Returns the loaded index configuration object.
+          context: $.indexConfig
+          schema:
+            type: object
+        throws:
+          name: Error
+          description: An unexpected error was encountered.
+          context: $.error
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+
+      getIndicesForLogtype:
+        name: Get indices for Logtype
+        description: Get configured indicies for the given log type
+        parameters:
+          logtype:
+            name: Log-Type
+            description: The LogType given by Filebeat.
+            required: true
+            schema:
+              type: string
+          indexConfigs:
+            name: Index configs
+            description: Object that contains all index configurations
+            required: true
+            schema:
+              type: object
+        returns:
+          name: Next
+          description: Returns the loaded index configuration object.
+          context: $.indexConfig
+          schema:
+            type: object
+        throws:
+          name: Error
+          description: An unexpected error was encountered.
+          context: $.error
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+
+      createIndices:
+        name: Create indices
+        description: Creates a multiple indices based on the given indices array.
+        parameters:
+          indices:
+            name: Indices
+            description: Array of indexConfiguration objects
+            required: true
+            schema:
+              type: object
+          region:
+            name: Region
+            description: Region the index should be created for
+            required: false
+            schema:
+              type: string
+        returns:
+          name: Next
+          description: Returns the loaded index configuration object.
+          context: $.indexConfig
+          schema:
+            type: object
+        throws:
+          name: Error
+          description: An unexpected error was encountered.
+          context: $.error
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+
+      updateRolloverAlias:
+        name: Update Rollover Alias
+        description: "Purpose of this method is to the update the static rollover-over according to the region of the index. See here for more information: https://discuss.elastic.co/t/manage-multiple-indicies-with-one-ilm-policy/258733"
+        parameters:
+          indices:
+            name: Indices
+            description: Array of indexConfiguration objects
+            required: true
+            schema:
+              type: object
+        returns:
+          name: Next
+          description: Returns the loaded index configuration object.
+          context: $.indexConfig
+          schema:
+            type: object
+        throws:
+          name: Error
+          description: An unexpected error was encountered.
+          context: $.error
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+
+      getPayloadFilename:
+        name: Get payload filename
+        description: Returns the filename of the payload based on the given Traffic-Details returned from Elasticsearch, the correlationId, Leg-Number and direction.
+        parameters:
+          correlationId:
+            name: CorrelationId
+            description: "The correlation ID of the transaction."
+            required: true
+            schema:
+              type: string
+          trafficDetails:
+            name: Traffic-Details
+            description: "Traffic details returned from Elasticsearch for the selected correlationID"
+            required: true
+            schema:
+              type: object
+          legNo:
+            name: Leg-Number
+            description: "The Leg-Number"
+            required: true
+            schema:
+              type: string
+          direction:
+            name: Direction
+            description: "The direction. Either sent or received"
+            required: true
+            schema:
+              type: string
+              enum:
+                - sent
+                - received
+          region:
+            name: Region
+            description: Returns the filename including the region prefix
+            required: false
+            schema:
+              type: string
+        outputs:
+          next:
+            name: Next
+            description: Returns the payload filename based on the given Traffic-Details.
+            context: $.payloadFilename
+            schema:
+              type: string
+          notFound:
+            name: Not found
+            description: Exit used if no payload is given in the traffic details for the given parameters.
+            context: $.notFoundMessage
+            schema:
+              type: string
+          noAccess:
+            name: No access
+            description: Exit used if transactionDetails hit is 0. Means, that the query returns no result, which is very likely because the user has no access.
+            context: $.noAccessMessage
+            schema:
+              type: string
+          error:
+            name: Error
+            description: An unexpected error happened
+            context: $.error
+            schema:
+              type: object
+
+      getHostname:
+        name: Get Hostname
+        description: "Returns the hostname the actual API-Builder process is running on."
+        returns:
+          name: Next
+          description: Returns the current hostname.
+          context: $.hostname
+          schema:
+            type: object
+        throws:
+          name: Error
+          description: An unexpected error was encountered.
+          context: $.error
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+
+      setupILMRententionPeriod:
+        name: Setup ILM Rentention-Period
+        description: "Configures the given ILM-Policy according to the provided number of days."
+        parameters:
+          indexConfig:
+            name: Index config
+            description: "Index configuration as defined in elasticsearch_config/index_config.json. It also contains the index name."
+            required: true
+            schema:
+              type: object
+          rententionPeriodConfig:
+            name: Rentention period config
+            description: "Contains the path of the retention period config file. If not given, the standard ILM is used."
+            required: true
+            schema:
+              type: string
+          ilmConfig:
+            name: ILM-Config
+            description: "The ILM Config object that is supposed to be send to Elasticsearch to create or update the ILM-Policy. It is read from the $.indexConfig.ilm.config file and converted into an object."
+            required: true
+            schema:
+              type: object
+        outputs:
+          next:
+            name: Next
+            description: Returns the updated ILM-Configuration object.
+            context: $.ilmPolicyBody
+            schema:
+              type: object
+          notChanged:
+            name: Not changed
+            description: The given ILM-Policy has not changed, because either no rention period parameter is given or it defaults to 15 days.
+            context: $.ilmPolicyBody
+            schema:
+              type: object
+          error:
+            name: Error
+            description: An unexpected error happened
+            context: $.error
+            schema:
+              type: object
