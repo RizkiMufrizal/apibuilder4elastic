@@ -1,4 +1,5 @@
 const APIBuilder = require('@axway/api-builder-runtime');
+require('dotenv').config();
 
 if(process.env.APM_ENABLED) {
 	console.log(`Application performance monitoring enabled. Using APM-Server: ${process.env.APM_SERVER || 'https://apm-server:8200'}`);
